@@ -2,6 +2,7 @@ from pathlib import Path
 
 from invoice_system.database import InvoiceDB
 from invoice_system.normalizer import ProductNormalizer, normalize_text
+from invoice_system.ocr import OCRExtractor
 from invoice_system.parser import InvoiceParser
 from invoice_system.service import InvoiceIngestionService
 
@@ -71,3 +72,24 @@ def test_database_alias_linking(tmp_path: Path) -> None:
         assert found == product_id
     finally:
         db.close()
+
+
+def test_pdf_uses_ocr_fallback_when_text_layer_is_empty(monkeypatch) -> None:
+    ocr = OCRExtractor()
+
+    monkeypatch.setattr(ocr, "_extract_pdf_text_layer", lambda _path: "")
+    monkeypatch.setattr(ocr, "_extract_pdf_scanned_with_ocr", lambda _path: "texto ocr")
+
+    result = ocr._extract_pdf(Path("dummy.pdf"))
+    assert result == "texto ocr"
+
+
+def test_pdf_uses_text_layer_when_available(monkeypatch) -> None:
+    ocr = OCRExtractor()
+    pdf_text = "Proveedor: Demo\nFactura N: 123\nFecha: 01/01/2025"
+
+    monkeypatch.setattr(ocr, "_extract_pdf_text_layer", lambda _path: pdf_text)
+    monkeypatch.setattr(ocr, "_extract_pdf_scanned_with_ocr", lambda _path: "no debe usarse")
+
+    result = ocr._extract_pdf(Path("dummy.pdf"))
+    assert result == pdf_text

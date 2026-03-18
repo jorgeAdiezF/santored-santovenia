@@ -2,7 +2,7 @@
 
 Este repositorio implementa una base funcional para:
 
-- Leer facturas escaneadas (imagen/PDF con OCR) y también archivos de texto.
+- Leer facturas escaneadas (especialmente PDF escaneado con OCR) y también archivos de texto.
 - Extraer por factura: **proveedor**, **fecha** y **líneas de productos**.
 - Procesar un archivo con **una o múltiples facturas** (por ejemplo PDF/txt con varios escaneos).
 - Normalizar nombres de producto aunque cada proveedor use descripciones distintas.
@@ -11,7 +11,7 @@ Este repositorio implementa una base funcional para:
 
 ## Arquitectura
 
-- `src/invoice_system/ocr.py`: extracción OCR/texto por formato.
+- `src/invoice_system/ocr.py`: extracción OCR/texto por formato, con fallback automático para PDF escaneado (`pdftoppm` + `tesseract`).
 - `src/invoice_system/parser.py`: parser de facturas y separación de facturas múltiples.
 - `src/invoice_system/normalizer.py`: normalización y similitud de nombres de producto.
 - `src/invoice_system/database.py`: modelo de datos SQLite + consultas de evolución.
@@ -76,6 +76,8 @@ Fecha: 01/01/2025
 ## Dependencias externas opcionales
 
 - `tesseract` para OCR de imágenes.
-- `pdftotext` (poppler) para extracción de texto de PDF.
+- `pdftotext` (poppler) para PDFs con capa de texto.
 
-Si no están instaladas, la ingesta OCR de esos formatos fallará con un mensaje explícito.
+- `pdftoppm` (poppler) para convertir páginas de PDF escaneado a imagen antes del OCR.
+
+Si faltan estas herramientas, la ingesta de PDF escaneado fallará con un mensaje explícito.
