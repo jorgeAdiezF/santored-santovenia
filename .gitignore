@@ -3,3 +3,5 @@ frontend/.env
 __pycache__/
 *.pyc
 .env
+frontend/dist/
+frontend/package-lock.json
