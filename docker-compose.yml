@@ -1,0 +1,293 @@
+version: "3.9"
+
+networks:
+  invoices_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  rabbitmq_data:
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: invoices_db
+      POSTGRES_USER: invoices_user
+      POSTGRES_PASSWORD: invoices_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/migrations:/docker-entrypoint-initdb.d
+    networks:
+      - invoices_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U invoices_user -d invoices_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - invoices_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - invoices_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - invoices_net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  auth_service:
+    build: ./backend/auth_service
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://invoices_user:invoices_pass@postgres:5432/invoices_db
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=${JWT_SECRET:-supersecretjwtkey}
+      - JWT_ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - invoices_net
+    restart: unless-stopped
+
+  document_service:
+    build: ./backend/document_service
+    ports:
+      - "8002:8002"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://invoices_user:invoices_pass@postgres:5432/invoices_db
+      - REDIS_URL=redis://redis:6379/0
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - MINIO_URL=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+      - MINIO_BUCKET=invoices
+      - JWT_SECRET=${JWT_SECRET:-supersecretjwtkey}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - invoices_net
+    restart: unless-stopped
+
+  segmentation_service:
+    build: ./backend/segmentation_service
+    ports:
+      - "8003:8003"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://invoices_user:invoices_pass@postgres:5432/invoices_db
+      - REDIS_URL=redis://redis:6379/0
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - MINIO_URL=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+      - MINIO_BUCKET=invoices
+      - JWT_SECRET=${JWT_SECRET:-supersecretjwtkey}
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - invoices_net
+    restart: unless-stopped
+
+  ocr_service:
+    build: ./backend/ocr_service
+    ports:
+      - "8004:8004"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://invoices_user:invoices_pass@postgres:5432/invoices_db
+      - REDIS_URL=redis://redis:6379/0
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - MINIO_URL=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+      - MINIO_BUCKET=invoices
+      - JWT_SECRET=${JWT_SECRET:-supersecretjwtkey}
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - invoices_net
+    restart: unless-stopped
+
+  materials_service:
+    build: ./backend/materials_service
+    ports:
+      - "8005:8005"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://invoices_user:invoices_pass@postgres:5432/invoices_db
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=${JWT_SECRET:-supersecretjwtkey}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - invoices_net
+    restart: unless-stopped
+
+  homologation_service:
+    build: ./backend/homologation_service
+    ports:
+      - "8006:8006"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://invoices_user:invoices_pass@postgres:5432/invoices_db
+      - REDIS_URL=redis://redis:6379/0
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - JWT_SECRET=${JWT_SECRET:-supersecretjwtkey}
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - invoices_net
+    restart: unless-stopped
+
+  review_service:
+    build: ./backend/review_service
+    ports:
+      - "8007:8007"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://invoices_user:invoices_pass@postgres:5432/invoices_db
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=${JWT_SECRET:-supersecretjwtkey}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - invoices_net
+    restart: unless-stopped
+
+  destinations_service:
+    build: ./backend/destinations_service
+    ports:
+      - "8008:8008"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://invoices_user:invoices_pass@postgres:5432/invoices_db
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=${JWT_SECRET:-supersecretjwtkey}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - invoices_net
+    restart: unless-stopped
+
+  analytics_service:
+    build: ./backend/analytics_service
+    ports:
+      - "8009:8009"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://invoices_user:invoices_pass@postgres:5432/invoices_db
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=${JWT_SECRET:-supersecretjwtkey}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - invoices_net
+    restart: unless-stopped
+
+  api_gateway:
+    build: ./backend/api_gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - JWT_SECRET=${JWT_SECRET:-supersecretjwtkey}
+      - AUTH_SERVICE_URL=http://auth_service:8001
+      - DOCUMENT_SERVICE_URL=http://document_service:8002
+      - SEGMENTATION_SERVICE_URL=http://segmentation_service:8003
+      - OCR_SERVICE_URL=http://ocr_service:8004
+      - MATERIALS_SERVICE_URL=http://materials_service:8005
+      - HOMOLOGATION_SERVICE_URL=http://homologation_service:8006
+      - REVIEW_SERVICE_URL=http://review_service:8007
+      - DESTINATIONS_SERVICE_URL=http://destinations_service:8008
+      - ANALYTICS_SERVICE_URL=http://analytics_service:8009
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - auth_service
+      - document_service
+      - materials_service
+      - analytics_service
+    networks:
+      - invoices_net
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+    depends_on:
+      - api_gateway
+    networks:
+      - invoices_net
+    restart: unless-stopped
