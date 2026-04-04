@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calculadora de Precio de Soldadura Manual</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config={theme:{extend:{fontFamily:{sans:['Inter','sans-serif']}}}};</script>
+  <style>
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    body{font-family:'Inter',sans-serif;background:#f1f5f9;margin:0}
+    input,select{font-size:16px!important}
+    .inp{width:100%;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:9px;outline:none;background:white;transition:border-color .15s,box-shadow .15s;min-height:44px}
+    .inp:focus{border-color:#f97316;box-shadow:0 0 0 3px rgba(249,115,22,.12)}
+    select.inp{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;background-size:18px;padding-right:36px;cursor:pointer}
+    .btn{min-height:44px;padding:10px 16px;border-radius:10px;font-weight:600;font-size:14px;cursor:pointer;border:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;touch-action:manipulation;transition:all .15s}
+    .btn-primary{background:#f97316;color:white}.btn-primary:hover{background:#ea580c}
+    .btn-ghost{background:rgba(255,255,255,.1);color:white;border:1px solid rgba(255,255,255,.25)}.btn-ghost:hover{background:rgba(255,255,255,.2)}
+    .btn-danger{background:#fee2e2;color:#dc2626}.btn-danger:hover{background:#fecaca}
+    .card{background:white;border-radius:14px;border:1px solid #e5e7eb;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+    .ch{padding:14px 18px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;gap:10px;background:#fafafa;cursor:pointer;user-select:none}
+    .cb{padding:16px 18px}
+    .nav-hdr{background:linear-gradient(135deg,#0f172a,#1e293b,#1e3a5f);position:sticky;top:0;z-index:40;box-shadow:0 2px 12px rgba(0,0,0,.3)}
+    .kpi{border-radius:11px;padding:12px 14px}
+    .fl{display:flex;align-items:center;gap:4px;font-size:12.5px;font-weight:500;color:#4b5563;margin-bottom:5px}
+    .sl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;margin-bottom:8px}
+    .crow{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #f9fafb}
+    .crow:last-child{border-bottom:none}
+    .ri{-webkit-appearance:none;appearance:none;width:100%;height:5px;border-radius:3px;background:#e5e7eb;outline:none}
+    .ri::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#f97316;cursor:pointer;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+    .ri::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#f97316;cursor:pointer;border:2px solid white}
+    .sbar{position:fixed;bottom:0;left:0;right:0;z-index:50;background:linear-gradient(135deg,#0f172a,#1e3a5f);box-shadow:0 -4px 20px rgba(0,0,0,.3)}
+    @media(min-width:1024px){.sbar{display:none!important}}
+    .print-only{display:none}
+    @media print{.no-print{display:none!important}.print-only{display:block!important}.sbar{display:none!important}body{background:white}}
+    ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-thumb{background:#d1d5db;border-radius:3px}
+    .tip{position:relative;display:inline-flex;align-items:center}
+    .tip-t{visibility:hidden;opacity:0;background:#1f2937;color:white;font-size:11px;border-radius:8px;padding:6px 10px;position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);white-space:pre-wrap;max-width:220px;text-align:center;z-index:100;transition:opacity .2s;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,.3);line-height:1.5}
+    .tip:hover .tip-t,.tip:focus .tip-t{visibility:visible;opacity:1}
+    .tab-btn{padding:7px 14px;font-size:13px;font-weight:500;border-radius:8px;cursor:pointer;transition:all .15s;white-space:nowrap;min-height:36px;touch-action:manipulation;border:none}
+    .tab-a{background:#f97316;color:white}.tab-i{color:#6b7280;background:transparent}.tab-i:hover{background:#f3f4f6;color:#374151}
+    .jbtn,.mbtn,.pbtn{cursor:pointer;touch-action:manipulation;transition:all .15s;border:2px solid #e5e7eb;background:white}
+    .jbtn{flex:1;padding:10px 8px;border-radius:12px;display:flex;flex-direction:column;align-items:center;gap:6px;min-height:82px}
+    .mbtn{flex:1;padding:12px 8px;border-radius:12px;display:flex;flex-direction:column;align-items:center;gap:5px}
+    .pbtn{flex:1;padding:9px 5px;border-radius:10px;text-align:center;font-size:12px;font-weight:600;min-height:54px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
+    .active-sel{border-color:#f97316!important;background:#fff7ed!important}
+    .tbtn{flex:1;padding:8px 5px;border-radius:8px;border:2px solid #e5e7eb;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;min-height:40px;background:white;touch-action:manipulation}
+    .tbtn.ts{border-color:#f97316;background:#fff7ed;color:#c2410c}
+    .err-box{background:#fef2f2;border:1.5px solid #fca5a5;border-radius:12px;padding:12px 14px}
+    .warn-box{background:#fffbeb;border:1.5px solid #fcd34d;border-radius:10px;padding:10px 14px}
+    .ok-box{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px 14px}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef,useMemo,useCallback}=React;
+
+const DEFAULT_DB={
+  currency:'€',
+  materials:{
+    carbonSteel:{name:'Acero al Carbono',density:7.85,pricePerKg:0.80},
+    stainlessSteel:{name:'Acero Inoxidable',density:8.0,pricePerKg:3.50},
+    aluminum:{name:'Aluminio',density:2.7,pricePerKg:4.50},
+  },
+  consumables:{
+    elec_2_5:{name:'Electrodo Ø2.5mm',pricePerKg:2.50,process:'SMAW',diameter:2.5,baseDepRate:0.90},
+    elec_3_2:{name:'Electrodo Ø3.2mm',pricePerKg:2.50,process:'SMAW',diameter:3.2,baseDepRate:1.50},
+    elec_4_0:{name:'Electrodo Ø4.0mm',pricePerKg:2.55,process:'SMAW',diameter:4.0,baseDepRate:2.20},
+    elec_5_0:{name:'Electrodo Ø5.0mm',pricePerKg:2.60,process:'SMAW',diameter:5.0,baseDepRate:3.00},
+    wire_s_08:{name:'Hilo sólido Ø0.8mm',pricePerKg:1.80,process:'GMAW',diameter:0.8},
+    wire_s_10:{name:'Hilo sólido Ø1.0mm',pricePerKg:1.75,process:'GMAW',diameter:1.0},
+    wire_s_12:{name:'Hilo sólido Ø1.2mm',pricePerKg:1.70,process:'GMAW',diameter:1.2},
+    wire_s_16:{name:'Hilo sólido Ø1.6mm',pricePerKg:1.85,process:'GMAW',diameter:1.6},
+    wire_t_12:{name:'Hilo tubular Ø1.2mm',pricePerKg:2.80,process:'FCAW',diameter:1.2},
+    wire_t_16:{name:'Hilo tubular Ø1.6mm',pricePerKg:2.90,process:'FCAW',diameter:1.6},
+    rod_t_16:{name:'Varilla TIG Ø1.6mm',pricePerKg:3.50,process:'GTAW',diameter:1.6},
+    rod_t_24:{name:'Varilla TIG Ø2.4mm',pricePerKg:3.50,process:'GTAW',diameter:2.4},
+  },
+  gases:{
+    co2_pure:{name:'CO₂ Puro',pricePerM3:0.25,compatible:['carbonSteel'],processes:['GMAW','FCAW']},
+    c25:{name:'C25 (Ar/CO₂ 75/25)',pricePerM3:0.45,compatible:['carbonSteel','stainlessSteel'],processes:['GMAW','FCAW']},
+    ar_co2_9010:{name:'Ar/CO₂ 90/10',pricePerM3:0.50,compatible:['carbonSteel','stainlessSteel'],processes:['GMAW','FCAW']},
+    ar_co2_955:{name:'Ar/CO₂ 95/5',pricePerM3:0.55,compatible:['carbonSteel','stainlessSteel'],processes:['GMAW','FCAW']},
+    pure_argon:{name:'Argón Puro',pricePerM3:1.20,compatible:['aluminum','stainlessSteel'],processes:['GMAW','GTAW','FCAW']},
+    he_ar:{name:'Helio/Argón (50/50)',pricePerM3:2.50,compatible:['aluminum','stainlessSteel'],processes:['GTAW','GMAW']},
+  },
+  labor:{baseRate:25.0,burdenMultiplier:1.45},
+  overhead:{energyPrice:0.15,maintenanceCostPerArcHour:5.0},
+};
+
+const PROCS={
+  SMAW:{name:'SMAW',full:'Electrodo Revestido',eff:0.65,gas:false,wire:false,em:'⚡'},
+  GMAW:{name:'GMAW',full:'MIG / MAG',eff:0.95,gas:true,wire:true,em:'🔧'},
+  FCAW:{name:'FCAW',full:'Hilo Tubular',eff:0.85,gas:true,wire:true,em:'🌀'},
+  GTAW:{name:'GTAW',full:'TIG',eff:0.99,gas:true,wire:true,em:'✨'},
+};
+
+function n(v,d=0){const r=parseFloat(v);return isNaN(r)?d:r;}
+function fmt(v,d=2){if(v==null||isNaN(v))return '—';return v.toFixed(d);}
+
+
+// ── MOTOR DE CÁLCULO ──────────────────────────────────────────
+function calcArea(jt,inp){
+  switch(jt){
+    case 'fillet':{const a=n(inp.legSize,6);return 0.5*a*a;}
+    case 'vGroove':{const t=n(inp.thickness,10),r=n(inp.rootOpening,2),ang=n(inp.grooveAngle,60);return r*t+t*t*Math.tan(ang/2*Math.PI/180);}
+    case 'square':{return n(inp.thickness,10)*n(inp.rootOpening,2);}
+    default:return 0;
+  }
+}
+
+function calcDR(proc,inp,rho,cons){
+  const eff=PROCS[proc].eff;
+  if(proc==='GMAW'||proc==='FCAW'||proc==='GTAW'){
+    const d=n(inp.wireDiameter,1.2),wfs=n(inp.wireFeedSpeed,5.0);
+    return Math.PI*d*d*wfs*rho*60/4000*eff;
+  }
+  if(proc==='SMAW') return (cons?.baseDepRate||n(inp.depRateSMAW,1.5))*eff;
+  return 1;
+}
+
+function calcAll(inp,db){
+  const mat=db.materials[inp.material];
+  const cons=db.consumables[inp.consumableKey];
+  const gas=inp.process!=='SMAW'?db.gases[inp.gas]:null;
+  if(!mat||!cons)return null;
+  const lm=n(inp.weldLength,1000)/1000;
+  const qty=Math.max(1,parseInt(inp.quantity)||1);
+  if(lm<=0)return null;
+  const Ast=calcArea(inp.jointType,inp);
+  if(Ast<=0)return null;
+  const PMD=Ast*lm*mat.density*1e-3;
+  const eff=PROCS[inp.process].eff;
+  const consumo=PMD/eff;
+  const DR=calcDR(inp.process,inp,mat.density,cons);
+  if(DR<=0)return null;
+  const TA=PMD/DR;
+  const FO=Math.max(0.05,Math.min(0.95,n(inp.operationFactor,30)/100));
+  const TT=TA/FO;
+  const hiSpat=['co2_pure','c25'].includes(inp.gas)&&inp.transferMode==='shortCircuit'&&inp.process!=='SMAW'&&inp.process!=='GTAW';
+  const loSpat=['spray','pulsed'].includes(inp.transferMode)&&inp.process!=='SMAW'&&inp.process!=='GTAW';
+  const delta=hiSpat?(8/60)*lm:loSpat?(2/60)*lm:0;
+  const TTd=TT+delta;
+  const lr=db.labor.baseRate*db.labor.burdenMultiplier;
+  const cCons=consumo*(cons.pricePerKg||0);
+  const cGas=gas?TA*(n(inp.gasFlowRate,15)*60/1000)*gas.pricePerM3:0;
+  const cLab=TTd*lr;
+  const pw=(n(inp.arcVoltage,26)*n(inp.weldingCurrent,200))/1000;
+  const cEnergy=(pw/0.85)*TA*db.overhead.energyPrice;
+  const cMaint=TA*db.overhead.maintenanceCostPerArcHour;
+  const total=cCons+cGas+cLab+cEnergy+cMaint;
+  const cpm=lm>0?total/lm:0;
+  return{Ast,PMD,consumo,eff,DR,TA,TT,delta,TTd,cCons,cGas,cLab,cEnergy,cMaint,total,cpm,totalProj:total*qty,lm,qty,pw,FO,lr,hiSpat,loSpat};
+}
+
+// ── COMPONENTES UI AUXILIARES ─────────────────────────────────
+function Tip({text,children}){
+  return <span className="tip">{children}<span className="tip-t">{text}</span></span>;
+}
+function IcoInfo({text}){
+  return <Tip text={text}><span style={{cursor:'help',fontSize:13,color:'#9ca3af'}}>ⓘ</span></Tip>;
+}
+function FL({label,hint,children}){
+  return(
+    <div>
+      <div className="fl">{label}{hint&&<IcoInfo text={hint}/>}</div>
+      {children}
+    </div>
+  );
+}
+function Inp({value,onChange,...rest}){
+  return <input className="inp" value={value} onChange={e=>onChange(e.target.value)} {...rest}/>;
+}
+function Sel({value,onChange,children,disabled}){
+  return(
+    <select className="inp" value={value} onChange={e=>onChange(e.target.value)} disabled={disabled} style={{cursor:disabled?'not-allowed':'pointer'}}>
+      {children}
+    </select>
+  );
+}
+function Sec({icon,title,children,open:initOpen=true}){
+  const[open,setOpen]=useState(initOpen);
+  return(
+    <div className="card">
+      <div className="ch" onClick={()=>setOpen(o=>!o)}>
+        <span style={{fontSize:18}}>{icon}</span>
+        <span style={{fontWeight:700,fontSize:15,color:'#111827',flex:1}}>{title}</span>
+        <span style={{color:'#9ca3af',fontSize:20,transition:'transform .2s',transform:open?'rotate(0)':'rotate(-90deg)'}}>▾</span>
+      </div>
+      {open&&<div className="cb">{children}</div>}
+    </div>
+  );
+}
+function KPI({label,value,unit,color='#f97316',sub}){
+  return(
+    <div className="kpi" style={{background:color+'18',border:`1.5px solid ${color}30`}}>
+      <div className="sl" style={{marginBottom:2}}>{label}</div>
+      <div style={{fontWeight:800,fontSize:19,color}}>
+        {value}<span style={{fontSize:12,fontWeight:500,marginLeft:3,opacity:.75}}>{unit}</span>
+      </div>
+      {sub&&<div style={{fontSize:11,color:'#6b7280',marginTop:1}}>{sub}</div>}
+    </div>
+  );
+}
+
+
+// ── PANEL BASE DE DATOS ───────────────────────────────────────
+function DBPanel({db,upDB,resetDB}){
+  const[tab,setTab]=useState('mat');
+  const cur=db.currency;
+  const tabs=[['mat','Materiales'],['cons','Consumibles'],['gas','Gases'],['lab','Mano de Obra'],['ov','Gastos Ind.']];
+  return(
+    <div style={{background:'#f8fafc',borderBottom:'1px solid #e5e7eb',padding:'0 0 20px'}} className="no-print">
+      <div style={{maxWidth:1200,margin:'0 auto',padding:'0 14px'}}>
+        <div style={{paddingTop:14,marginBottom:12,display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8}}>
+          <span style={{fontWeight:700,fontSize:13.5,color:'#374151'}}>⚙️ Base de Datos de Proveedores</span>
+          <div style={{display:'flex',gap:8,alignItems:'center'}}>
+            <label style={{fontSize:13,color:'#6b7280',fontWeight:500}}>Divisa:</label>
+            <input className="inp" value={db.currency} onChange={e=>upDB('currency',e.target.value)} style={{width:55,textAlign:'center',padding:'5px 8px',minHeight:36}}  maxLength={3}/>
+            <button className="btn btn-danger" style={{minHeight:36,padding:'6px 12px',fontSize:13}} onClick={resetDB}>↺ Restaurar</button>
+          </div>
+        </div>
+        <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:4}}>
+          {tabs.map(([id,lbl])=>(
+            <button key={id} className={`tab-btn ${tab===id?'tab-a':'tab-i'}`} onClick={()=>setTab(id)}>{lbl}</button>
+          ))}
+        </div>
+        <div style={{marginTop:14}}>
+          {tab==='mat'&&(
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:10}}>
+              {Object.entries(db.materials).map(([k,m])=>(
+                <div key={k} className="card" style={{padding:'12px 14px'}}>
+                  <div style={{fontWeight:600,fontSize:14,color:'#111827',marginBottom:10}}>{m.name}</div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                    <FL label="Densidad (g/cm³)"><Inp type="number" value={m.density} onChange={v=>upDB(`materials.${k}.density`,parseFloat(v))} step="0.01" min="0.1"/></FL>
+                    <FL label={`Precio (${cur}/kg)`}><Inp type="number" value={m.pricePerKg} onChange={v=>upDB(`materials.${k}.pricePerKg`,parseFloat(v))} step="0.01" min="0"/></FL>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {tab==='cons'&&(
+            <div style={{overflowX:'auto'}}>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:13,minWidth:480}}>
+                <thead><tr style={{background:'#f9fafb',borderBottom:'2px solid #e5e7eb'}}>
+                  {['Consumible','Proceso','Precio ('+cur+'/kg)','Dep. base (kg/h)'].map(h=>(
+                    <th key={h} style={{padding:'9px 12px',textAlign:'left',fontWeight:600,color:'#374151',whiteSpace:'nowrap'}}>{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>{Object.entries(db.consumables).map(([k,c])=>(
+                  <tr key={k} style={{borderBottom:'1px solid #f3f4f6'}}>
+                    <td style={{padding:'7px 12px',color:'#111827',fontWeight:500}}>{c.name}</td>
+                    <td style={{padding:'7px 12px'}}><span style={{background:'#f3f4f6',borderRadius:6,padding:'2px 8px',fontSize:12,fontWeight:700}}>{c.process}</span></td>
+                    <td style={{padding:'7px 12px'}}><input className="inp" type="number" value={c.pricePerKg} onChange={e=>upDB(`consumables.${k}.pricePerKg`,parseFloat(e.target.value))} step="0.01" min="0" style={{width:85,padding:'5px 8px',minHeight:36}}/></td>
+                    <td style={{padding:'7px 12px'}}>{c.process==='SMAW'?<input className="inp" type="number" value={c.baseDepRate} onChange={e=>upDB(`consumables.${k}.baseDepRate`,parseFloat(e.target.value))} step="0.1" min="0.1" style={{width:85,padding:'5px 8px',minHeight:36}}/>:<span style={{color:'#9ca3af',fontSize:12}}>Calculado</span>}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          )}
+          {tab==='gas'&&(
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))',gap:10}}>
+              {Object.entries(db.gases).map(([k,g])=>(
+                <div key={k} className="card" style={{padding:'12px 14px'}}>
+                  <div style={{fontWeight:600,fontSize:13.5,color:'#111827',marginBottom:4}}>{g.name}</div>
+                  <div style={{fontSize:11.5,color:'#6b7280',marginBottom:9}}>Compatible: {g.compatible.map(m=>db.materials[m]?.name||m).join(', ')}</div>
+                  <FL label={`Precio (${cur}/m³)`}><Inp type="number" value={g.pricePerM3} onChange={v=>upDB(`gases.${k}.pricePerM3`,parseFloat(v))} step="0.01" min="0"/></FL>
+                </div>
+              ))}
+            </div>
+          )}
+          {tab==='lab'&&(
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:10}}>
+              <div className="card" style={{padding:'14px'}}>
+                <div style={{fontWeight:600,fontSize:14,marginBottom:12}}>Salario y Cargas Sociales</div>
+                <div style={{display:'flex',flexDirection:'column',gap:11}}>
+                  <FL label={`Salario Base (${cur}/hr)`} hint="Coste horario del operario antes de cargas"><Inp type="number" value={db.labor.baseRate} onChange={v=>upDB('labor.baseRate',parseFloat(v))} step="0.5" min="0"/></FL>
+                  <FL label="Multiplicador Labor Burden" hint={`Incluye S.Social, vacaciones, seguros.\nEj: 1.45x → coste real = salario × 1.45`}><Inp type="number" value={db.labor.burdenMultiplier} onChange={v=>upDB('labor.burdenMultiplier',parseFloat(v))} step="0.01" min="1" max="4"/></FL>
+                  <div style={{background:'#f0fdf4',borderRadius:10,padding:'9px 12px',fontSize:13}}>
+                    <span style={{color:'#166534',fontWeight:700}}>Costo efectivo: {cur}{(db.labor.baseRate*db.labor.burdenMultiplier).toFixed(2)}/hr</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {tab==='ov'&&(
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:10}}>
+              <div className="card" style={{padding:'14px'}}>
+                <div style={{fontWeight:600,fontSize:14,marginBottom:12}}>Gastos Indirectos</div>
+                <div style={{display:'flex',flexDirection:'column',gap:11}}>
+                  <FL label={`Energía (${cur}/kWh)`} hint="Precio del kilovatio-hora eléctrico"><Inp type="number" value={db.overhead.energyPrice} onChange={v=>upDB('overhead.energyPrice',parseFloat(v))} step="0.01" min="0"/></FL>
+                  <FL label={`Mantenimiento (${cur}/h arco)`} hint="Coste de mantenimiento por hora de arco (toberas, contactos, etc.)"><Inp type="number" value={db.overhead.maintenanceCostPerArcHour} onChange={v=>upDB('overhead.maintenanceCostPerArcHour',parseFloat(v))} step="0.1" min="0"/></FL>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ── TARJETA GEOMETRÍA ─────────────────────────────────────────
+const JSVG={
+  fillet:(
+    <svg width="52" height="42" viewBox="0 0 52 42">
+      <rect x="3" y="24" width="30" height="9" rx="2" fill="#64748b"/>
+      <rect x="23" y="3" width="9" height="21" rx="2" fill="#64748b"/>
+      <polygon points="23,24 32,24 32,6" fill="#f97316" opacity=".88"/>
+    </svg>
+  ),
+  vGroove:(
+    <svg width="52" height="42" viewBox="0 0 52 42">
+      <polygon points="3,3 22,3 26,38 3,38" fill="#64748b"/>
+      <polygon points="30,38 26,38 49,3 49,38" fill="#64748b"/>
+      <polygon points="22,3 30,3 26,36" fill="#f97316" opacity=".88"/>
+    </svg>
+  ),
+  square:(
+    <svg width="52" height="42" viewBox="0 0 52 42">
+      <rect x="3" y="5" width="20" height="33" rx="2" fill="#64748b"/>
+      <rect x="29" y="5" width="20" height="33" rx="2" fill="#64748b"/>
+      <rect x="23" y="5" width="6" height="33" fill="#f97316" opacity=".88"/>
+    </svg>
+  ),
+};
+
+function GeometryCard({inp,upd}){
+  const Ast=calcArea(inp.jointType,inp);
+  return(
+    <Sec icon="📐" title="Geometría de la Unión">
+      <div style={{marginBottom:16}}>
+        <div className="sl">Tipo de Junta</div>
+        <div style={{display:'flex',gap:8}}>
+          {[['fillet','Filete'],['vGroove','V-Groove'],['square','Cuadrada']].map(([v,l])=>(
+            <button key={v} className={`jbtn${inp.jointType===v?' active-sel':''}`} onClick={()=>upd('jointType',v)}>
+              {JSVG[v]}
+              <span style={{fontSize:11,fontWeight:600,color:inp.jointType===v?'#c2410c':'#6b7280'}}>{l}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:11,marginBottom:12}}>
+        {inp.jointType==='fillet'&&(
+          <FL label="Cateto (mm)" hint="Tamaño del cateto del filete en mm"><Inp type="number" value={inp.legSize} onChange={v=>upd('legSize',v)} min="1" step="0.5"/></FL>
+        )}
+        {inp.jointType!=='fillet'&&(
+          <FL label="Espesor t (mm)" hint="Espesor de la chapa en mm"><Inp type="number" value={inp.thickness} onChange={v=>upd('thickness',v)} min="1" step="0.5"/></FL>
+        )}
+        {inp.jointType!=='fillet'&&(
+          <FL label="Apertura Raíz (mm)" hint="Separación entre piezas en la raíz"><Inp type="number" value={inp.rootOpening} onChange={v=>upd('rootOpening',v)} min="0" step="0.5"/></FL>
+        )}
+        {inp.jointType==='vGroove'&&(
+          <FL label="Ángulo Incluido (°)" hint="Ángulo total del bisel en V (ej: 60°)"><Inp type="number" value={inp.grooveAngle} onChange={v=>upd('grooveAngle',v)} min="20" max="120" step="5"/></FL>
+        )}
+        <FL label="Longitud total (mm)" hint="Longitud de soldadura a calcular"><Inp type="number" value={inp.weldLength} onChange={v=>upd('weldLength',v)} min="1" step="100"/></FL>
+        <FL label="Cantidad de juntas" hint="Nº de uniones idénticas (multiplica el costo total)"><Inp type="number" value={inp.quantity} onChange={v=>upd('quantity',v)} min="1" step="1"/></FL>
+      </div>
+      {Ast>0&&(
+        <div style={{background:'#f0f9ff',borderRadius:9,padding:'9px 12px',fontSize:12.5,color:'#0369a1',fontWeight:500}}>
+          A<sub>ST</sub> = <strong>{fmt(Ast,2)} mm²</strong>
+          &nbsp;·&nbsp;
+          Longitud = <strong>{fmt(n(inp.weldLength,1000)/1000,3)} m</strong>
+        </div>
+      )}
+    </Sec>
+  );
+}
+
+// ── TARJETA MATERIAL ──────────────────────────────────────────
+const MICONS={carbonSteel:'🔩',stainlessSteel:'🪩',aluminum:'🔘'};
+function MaterialCard({inp,upd,db}){
+  const mat=db.materials[inp.material];
+  return(
+    <Sec icon="🧲" title="Material Base">
+      <div style={{display:'flex',gap:8,marginBottom:14}}>
+        {Object.entries(db.materials).map(([k,m])=>(
+          <button key={k} className={`mbtn${inp.material===k?' active-sel':''}`} onClick={()=>upd('material',k)}>
+            <span style={{fontSize:22}}>{MICONS[k]}</span>
+            <span style={{fontSize:11,fontWeight:600,color:inp.material===k?'#c2410c':'#374151',textAlign:'center',lineHeight:1.3}}>{m.name}</span>
+          </button>
+        ))}
+      </div>
+      {mat&&(
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+          <div style={{background:'#f9fafb',borderRadius:9,padding:'9px 12px'}}>
+            <div className="sl">Densidad</div>
+            <div style={{fontWeight:700,fontSize:16,color:'#111827'}}>{mat.density}<span style={{fontSize:11,fontWeight:400,color:'#6b7280'}}> g/cm³</span></div>
+          </div>
+          <div style={{background:'#f9fafb',borderRadius:9,padding:'9px 12px'}}>
+            <div className="sl">Precio base</div>
+            <div style={{fontWeight:700,fontSize:16,color:'#111827'}}>{db.currency}{mat.pricePerKg.toFixed(2)}<span style={{fontSize:11,fontWeight:400,color:'#6b7280'}}> /kg</span></div>
+          </div>
+        </div>
+      )}
+    </Sec>
+  );
+}
+
+
+// ── TARJETA PROCESO ───────────────────────────────────────────
+function ProcessCard({inp,upd,db,avCons,avGas,valErr}){
+  const proc=PROCS[inp.process];
+  const isSMAW=inp.process==='SMAW';
+  const isGTAW=inp.process==='GTAW';
+  const mat=db.materials[inp.material];
+  const DR_preview=()=>{
+    if(!isSMAW&&mat){
+      const d=n(inp.wireDiameter,1.2),wfs=n(inp.wireFeedSpeed,5.0);
+      const raw=Math.PI*d*d*wfs*mat.density*60/4000;
+      return (raw*proc.eff).toFixed(3);
+    }
+    return null;
+  };
+  return(
+    <Sec icon="🔥" title="Parámetros de Soldadura">
+      <div style={{marginBottom:16}}>
+        <div className="sl">Proceso de Soldadura</div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:6}}>
+          {Object.entries(PROCS).map(([k,p])=>(
+            <button key={k} className={`pbtn${inp.process===k?' active-sel':''}`} onClick={()=>upd('process',k)}>
+              <span style={{fontSize:20}}>{p.em}</span>
+              <span style={{fontSize:11,fontWeight:700,color:inp.process===k?'#c2410c':'#374151'}}>{p.name}</span>
+              <span style={{fontSize:10,color:inp.process===k?'#ea580c':'#9ca3af'}}>{p.full}</span>
+            </button>
+          ))}
+        </div>
+        <div style={{marginTop:8,background:'#f9fafb',borderRadius:9,padding:'7px 11px',fontSize:12,color:'#6b7280',display:'flex',gap:14,flexWrap:'wrap'}}>
+          <span>⚡ Eficiencia deposición: <strong style={{color:'#111827'}}>{(proc.eff*100).toFixed(0)}%</strong></span>
+          {!isSMAW&&<span>📌 Método del Reloj (1.2mm): 1.8 m/min → ~0.9 kg/h</span>}
+        </div>
+      </div>
+      <div style={{display:'flex',flexDirection:'column',gap:13}}>
+        <FL label="Consumible" hint="Electrodo, hilo o varilla de aportación">
+          <Sel value={inp.consumableKey} onChange={v=>{upd('consumableKey',v);const c=db.consumables[v];if(c?.diameter)upd('wireDiameter',String(c.diameter));}}>
+            {avCons.map(([k,c])=><option key={k} value={k}>{c.name} — {db.currency}{c.pricePerKg}/kg</option>)}
+          </Sel>
+        </FL>
+        {!isSMAW&&(
+          <FL label={isGTAW?'Veloc. Varilla TIG (m/min)':'Veloc. Alimentación (m/min)'} hint={isGTAW?'Velocidad de aporte de varilla de relleno':'Vel. de alimentación del hilo\nRef. Ø1.2mm: 1.8 m/min ≈ 0.9 kg/h depositado'}>
+            <div style={{display:'flex',gap:10,alignItems:'center'}}>
+              <Inp type="number" value={inp.wireFeedSpeed} onChange={v=>upd('wireFeedSpeed',v)} min="0.1" step="0.1" max={isGTAW?'5':'25'} style={{flex:1}}/>
+              {DR_preview()&&<div style={{fontSize:11.5,color:'#6b7280',whiteSpace:'nowrap'}}>≈ <strong style={{color:'#f97316'}}>{DR_preview()}</strong> kg/h dep.</div>}
+            </div>
+          </FL>
+        )}
+        {isSMAW&&(
+          <div className="warn-box" style={{fontSize:12.5,color:'#92400e'}}>
+            ⚡ Tasa deposición del electrodo: <strong>{((db.consumables[inp.consumableKey]?.baseDepRate||1.5)*proc.eff).toFixed(3)} kg/h</strong> (depositado efectivo)
+          </div>
+        )}
+        {!isSMAW&&(
+          <>
+            <FL label="Gas de Protección" hint="Gas o mezcla para protección del arco">
+              <Sel value={inp.gas} onChange={v=>upd('gas',v)} disabled={avGas.length===0}>
+                {avGas.length===0
+                  ?<option>Sin gas compatible para este material/proceso</option>
+                  :avGas.map(([k,g])=><option key={k} value={k}>{g.name} — {db.currency}{g.pricePerM3}/m³</option>)
+                }
+              </Sel>
+            </FL>
+            {valErr&&(
+              <div className="err-box">
+                <div style={{fontWeight:800,color:'#dc2626',fontSize:14,marginBottom:4}}>⛔ Error de Seguridad</div>
+                <div style={{fontSize:13,color:'#7f1d1d',lineHeight:1.6}}>{valErr}</div>
+              </div>
+            )}
+            {!isGTAW&&(
+              <FL label="Modo de Transferencia" hint="Afecta nivel de salpicaduras y tiempo de limpieza\nCO₂/C25 + Cortocircuito → +8 min/metro\nSpray/Pulsado → +2 min/metro">
+                <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:7}}>
+                  {[['shortCircuit','Cortocircuito'],['spray','Spray'],['pulsed','Pulsado']].map(([id,lbl])=>(
+                    <button key={id} className={`tbtn${inp.transferMode===id?' ts':''}`} onClick={()=>upd('transferMode',id)}>{lbl}</button>
+                  ))}
+                </div>
+              </FL>
+            )}
+            <FL label="Caudal de Gas (L/min)" hint="Caudal del gas de protección"><Inp type="number" value={inp.gasFlowRate} onChange={v=>upd('gasFlowRate',v)} min="3" max="40" step="0.5"/></FL>
+          </>
+        )}
+        <FL label={`Factor de Operación (FO): ${inp.operationFactor}%`} hint={`% del tiempo total con arco encendido.\nIncluye cambios de electrodo, posicionado,\nlimpieza escoria, fatiga y pausas.\nSMAW: 10-30%  GMAW: 20-40%  FCAW: 30-50%  GTAW: 10-25%`}>
+          <div style={{paddingTop:5,paddingBottom:4}}>
+            <input type="range" className="ri" value={inp.operationFactor} onChange={e=>upd('operationFactor',e.target.value)} min="10" max="50" step="1"/>
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:11,color:'#9ca3af',marginTop:3}}>
+              <span>10% Bajo</span><span>30% Típico</span><span>50% Alto</span>
+            </div>
+          </div>
+        </FL>
+        <div style={{borderTop:'1px solid #f3f4f6',paddingTop:12}}>
+          <div className="sl">Parámetros Eléctricos</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:11}}>
+            <FL label="Tensión de Arco (V)"><Inp type="number" value={inp.arcVoltage} onChange={v=>upd('arcVoltage',v)} min="10" max="50" step="0.5"/></FL>
+            <FL label="Corriente (A)"><Inp type="number" value={inp.weldingCurrent} onChange={v=>upd('weldingCurrent',v)} min="20" max="800" step="5"/></FL>
+          </div>
+          <div style={{marginTop:8,fontSize:12,color:'#6b7280',background:'#f9fafb',borderRadius:8,padding:'7px 11px'}}>
+            Potencia: <strong style={{color:'#374151'}}>{fmt(n(inp.arcVoltage,26)*n(inp.weldingCurrent,200)/1000,2)} kW</strong>
+          </div>
+        </div>
+      </div>
+    </Sec>
+  );
+}
+
+
+// ── TARJETA RESULTADOS ────────────────────────────────────────
+function ResultsCard({r,db,cur}){
+  const rows=[
+    {label:'Consumible',  val:r.cCons,  color:'#3b82f6'},
+    {label:'Gas',         val:r.cGas,   color:'#8b5cf6'},
+    {label:'Mano de Obra',val:r.cLab,   color:'#f97316'},
+    {label:'Energía',     val:r.cEnergy,color:'#eab308'},
+    {label:'Mantenimiento',val:r.cMaint,color:'#6b7280'},
+  ];
+  return(
+    <div className="card" style={{boxShadow:'0 2px 10px rgba(0,0,0,.1)'}}>
+      <div className="ch" style={{background:'linear-gradient(135deg,#0f172a,#1e3a5f)',cursor:'default'}}>
+        <span style={{fontSize:18}}>📊</span>
+        <span style={{fontWeight:700,fontSize:15,color:'white'}}>Resultados del Cálculo</span>
+      </div>
+      <div className="cb">
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
+          <KPI label="Metal Depositado" value={fmt(r.PMD,3)} unit="kg" color="#3b82f6" sub={`Consumo: ${fmt(r.consumo,3)} kg`}/>
+          <KPI label="Tasa Deposición" value={fmt(r.DR,3)} unit="kg/h" color="#8b5cf6" sub={`Efic. ${(r.eff*100).toFixed(0)}%`}/>
+          <KPI label="Tiempo de Arco" value={fmt(r.TA*60,1)} unit="min" color="#f97316" sub={`Total c/FO: ${fmt(r.TT*60,1)} min`}/>
+          <KPI label="Costo / Metro" value={`${cur}${fmt(r.cpm,3)}`} unit="/m" color="#10b981"/>
+        </div>
+        {r.hiSpat&&(
+          <div className="warn-box" style={{marginBottom:10,fontSize:12.5,color:'#92400e'}}>
+            ⚠️ <strong>Salpicaduras (C25/CO₂ + Cortocircuito):</strong> +8 min/metro = +{fmt(r.delta*60,1)} min de limpieza en costo laboral
+          </div>
+        )}
+        {r.loSpat&&(
+          <div className="ok-box" style={{marginBottom:10,fontSize:12.5,color:'#166534'}}>
+            ✅ <strong>Modo Spray/Pulsado:</strong> Mínimas salpicaduras — +2 min/metro = +{fmt(r.delta*60,1)} min
+          </div>
+        )}
+        <div style={{marginBottom:14}}>
+          <div className="sl">Desglose de Costos (por costura)</div>
+          {rows.map(({label,val,color})=>{
+            const pct=r.total>0?(val/r.total*100):0;
+            return(
+              <div key={label} className="crow">
+                <div style={{display:'flex',alignItems:'center',gap:7,flex:1}}>
+                  <div style={{width:10,height:10,borderRadius:'50%',background:color,flexShrink:0}}/>
+                  <span style={{fontSize:13,color:'#374151'}}>{label}</span>
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <div style={{width:56,height:5,background:'#f3f4f6',borderRadius:3,overflow:'hidden'}}>
+                    <div style={{width:`${Math.max(0,pct)}%`,height:'100%',background:color,borderRadius:3}}/>
+                  </div>
+                  <span style={{fontSize:11.5,color:'#9ca3af',width:38,textAlign:'right'}}>{pct.toFixed(1)}%</span>
+                  <span style={{fontSize:13,fontWeight:600,color:'#111827',width:80,textAlign:'right'}}>{cur}{fmt(val,3)}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{background:'#f8fafc',borderRadius:12,padding:'12px 14px'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+            <span style={{fontSize:12.5,color:'#6b7280'}}>Total costura ({fmt(r.lm,3)} m):</span>
+            <span style={{fontSize:16,fontWeight:700,color:'#111827'}}>{cur}{fmt(r.total,2)}</span>
+          </div>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:r.qty>1?8:0}}>
+            <span style={{fontSize:12.5,color:'#6b7280'}}>Costo por metro lineal:</span>
+            <span style={{fontSize:16,fontWeight:700,color:'#10b981'}}>{cur}{fmt(r.cpm,4)}/m</span>
+          </div>
+          {r.qty>1&&(
+            <div style={{borderTop:'2px solid #e5e7eb',paddingTop:9,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <span style={{fontSize:14,fontWeight:600,color:'#374151'}}>TOTAL PROYECTO ({r.qty} juntas):</span>
+              <span style={{fontSize:22,fontWeight:900,color:'#f97316'}}>{cur}{fmt(r.totalProj,2)}</span>
+            </div>
+          )}
+        </div>
+        <details style={{marginTop:11}}>
+          <summary style={{cursor:'pointer',fontSize:12.5,fontWeight:500,color:'#6b7280',padding:'6px 0',userSelect:'none'}}>🔬 Resumen técnico completo</summary>
+          <div style={{marginTop:8,background:'#f9fafb',borderRadius:9,padding:'11px 13px',fontSize:12}}>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:7}}>
+              {[
+                ['Área transversal A_ST',`${fmt(r.Ast,2)} mm²`],
+                ['Metal depositado (PMD)',`${fmt(r.PMD,4)} kg`],
+                ['Consumo real (con pérdidas)',`${fmt(r.consumo,4)} kg`],
+                ['Tasa deposición (DR)',`${fmt(r.DR,4)} kg/h`],
+                ['Tiempo de arco (TA)',`${fmt(r.TA*60,2)} min`],
+                ['Tiempo total c/FO',`${fmt(r.TT*60,2)} min`],
+                ['Delta limpieza salpicaduras',`${fmt(r.delta*60,2)} min`],
+                ['Tiempo total efectivo',`${fmt(r.TTd*60,2)} min`],
+                ['Potencia de arco',`${fmt(r.pw,3)} kW`],
+                ['Costo laboral efectivo',`${db.currency}${fmt(r.lr,2)}/hr`],
+              ].map(([k,v])=>(
+                <div key={k}><div style={{color:'#9ca3af',fontSize:11}}>{k}</div><div style={{fontWeight:600,color:'#111827'}}>{v}</div></div>
+              ))}
+            </div>
+          </div>
+        </details>
+      </div>
+    </div>
+  );
+}
+
+// ── GRÁFICO DE DONA ───────────────────────────────────────────
+function ChartCard({r,cur}){
+  const cvRef=useRef(null);
+  const chRef=useRef(null);
+  const data=useMemo(()=>({
+    labels:['Mano de Obra','Consumible','Gas','Energía','Mantenimiento'],
+    values:[r.cLab,r.cCons,r.cGas,r.cEnergy,r.cMaint],
+    colors:['#f97316','#3b82f6','#8b5cf6','#eab308','#6b7280'],
+  }),[r]);
+  useEffect(()=>{
+    if(!cvRef.current)return;
+    if(chRef.current){chRef.current.destroy();chRef.current=null;}
+    chRef.current=new Chart(cvRef.current,{
+      type:'doughnut',
+      data:{labels:data.labels,datasets:[{data:data.values,backgroundColor:data.colors,borderColor:'white',borderWidth:3,hoverOffset:8}]},
+      options:{
+        responsive:true,maintainAspectRatio:true,cutout:'60%',
+        plugins:{
+          legend:{position:'bottom',labels:{padding:14,usePointStyle:true,font:{size:12,family:'Inter'}}},
+          tooltip:{callbacks:{label:c=>` ${c.label}: ${cur}${c.parsed.toFixed(3)} (${(c.parsed/r.total*100).toFixed(1)}%)`}},
+        },
+      },
+    });
+    return()=>{if(chRef.current){chRef.current.destroy();chRef.current=null;}};
+  },[data]);
+  const labPct=r.total>0?(r.cLab/r.total*100):0;
+  const matPct=r.total>0?((r.cCons+r.cGas)/r.total*100):0;
+  return(
+    <div className="card">
+      <div className="ch" style={{background:'#fafafa'}}>
+        <span style={{fontSize:18}}>🥧</span>
+        <span style={{fontWeight:700,fontSize:15,color:'#111827'}}>Distribución de Costos</span>
+      </div>
+      <div className="cb">
+        <canvas ref={cvRef} style={{maxHeight:270}}/>
+        <div style={{marginTop:10,textAlign:'center',fontSize:12,color:'#6b7280'}}>
+          <span>Laboral: <strong style={{color:'#f97316'}}>{labPct.toFixed(1)}%</strong></span>
+          <span style={{margin:'0 10px'}}>·</span>
+          <span>Materiales+Gas: <strong style={{color:'#3b82f6'}}>{matPct.toFixed(1)}%</strong></span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ── REPORTE DE IMPRESIÓN ──────────────────────────────────────
+function PrintReport({r,inp,db}){
+  const cur=db.currency;
+  const mat=db.materials[inp.material];
+  const cons=db.consumables[inp.consumableKey];
+  const gas=db.gases[inp.gas];
+  const proc=PROCS[inp.process];
+  const now=new Date().toLocaleDateString('es-ES',{year:'numeric',month:'long',day:'numeric'});
+  const geoDesc=inp.jointType==='fillet'?`Filete — cateto ${inp.legSize}mm`:inp.jointType==='vGroove'?`V-Groove — t${inp.thickness}mm / ángulo ${inp.grooveAngle}°`:`Cuadrada — t${inp.thickness}mm / raíz ${inp.rootOpening}mm`;
+  return(
+    <div className="print-only" style={{padding:'20px 24px',maxWidth:800,margin:'0 auto',fontFamily:'Inter,sans-serif',fontSize:13}}>
+      <div style={{borderBottom:'3px solid #f97316',paddingBottom:14,marginBottom:18}}>
+        <h1 style={{fontSize:22,fontWeight:900,color:'#111827',margin:0}}>Informe de Costo de Soldadura Manual</h1>
+        <p style={{color:'#6b7280',margin:'4px 0 0'}}>Fecha: {now} · Sistema Métrico · Cálculo de Alta Precisión</p>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:18,marginBottom:18}}>
+        <div>
+          <h3 style={{fontSize:12,fontWeight:700,color:'#374151',marginBottom:8,textTransform:'uppercase',letterSpacing:'.05em'}}>Parámetros de Entrada</h3>
+          {[['Material',mat?.name],['Proceso',`${proc?.name} — ${proc?.full}`],['Consumible',cons?.name],['Gas protección',gas?.name||'N/A (SMAW)'],['Geometría',geoDesc],['Longitud',`${(n(inp.weldLength,1000)/1000).toFixed(3)} m`],['Cantidad juntas',inp.quantity],['Factor Operación',`${inp.operationFactor}%`],['Tensión / Corriente',`${inp.arcVoltage} V / ${inp.weldingCurrent} A`]].map(([k,v])=>(
+            <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'4px 0',borderBottom:'1px solid #f3f4f6',fontSize:12}}>
+              <span style={{color:'#6b7280'}}>{k}:</span><span style={{fontWeight:600}}>{v}</span>
+            </div>
+          ))}
+        </div>
+        <div>
+          <h3 style={{fontSize:12,fontWeight:700,color:'#374151',marginBottom:8,textTransform:'uppercase',letterSpacing:'.05em'}}>Resultados Técnicos</h3>
+          {[['Área transversal A_ST',`${fmt(r.Ast,2)} mm²`],['Metal depositado (PMD)',`${fmt(r.PMD,4)} kg`],['Consumo real',`${fmt(r.consumo,4)} kg`],['Eficiencia deposición',`${(r.eff*100).toFixed(0)}%`],['Tasa deposición (DR)',`${fmt(r.DR,4)} kg/h`],['Tiempo de arco (TA)',`${fmt(r.TA*60,2)} min`],['Factor Operación (FO)',`${(r.FO*100).toFixed(0)}%`],['Delta limpieza',`${fmt(r.delta*60,2)} min`],['Tiempo total efectivo',`${fmt(r.TTd*60,2)} min`],['Potencia arco',`${fmt(r.pw,3)} kW`]].map(([k,v])=>(
+            <div key={k} style={{display:'flex',justifyContent:'space-between',padding:'4px 0',borderBottom:'1px solid #f3f4f6',fontSize:12}}>
+              <span style={{color:'#6b7280'}}>{k}:</span><span style={{fontWeight:600}}>{v}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <h3 style={{fontSize:12,fontWeight:700,color:'#374151',marginBottom:8,textTransform:'uppercase',letterSpacing:'.05em'}}>Desglose de Costos</h3>
+      <table style={{width:'100%',borderCollapse:'collapse',marginBottom:16}}>
+        <thead><tr style={{background:'#f9fafb'}}>
+          {['Concepto','Costo Unitario','% del Total','Total Proyecto'].map(h=>(
+            <th key={h} style={{padding:'8px 10px',textAlign:h==='Concepto'?'left':'right',fontSize:12,fontWeight:700,color:'#374151',borderBottom:'2px solid #e5e7eb'}}>{h}</th>
+          ))}
+        </tr></thead>
+        <tbody>
+          {[['Mano de Obra',r.cLab],['Consumible',r.cCons],['Gas de Protección',r.cGas],['Energía',r.cEnergy],['Mantenimiento',r.cMaint]].map(([lbl,val])=>(
+            <tr key={lbl} style={{borderBottom:'1px solid #f3f4f6'}}>
+              <td style={{padding:'6px 10px',fontSize:12}}>{lbl}</td>
+              <td style={{padding:'6px 10px',fontSize:12,textAlign:'right'}}>{cur}{fmt(val,4)}</td>
+              <td style={{padding:'6px 10px',fontSize:12,textAlign:'right'}}>{(r.total>0?val/r.total*100:0).toFixed(1)}%</td>
+              <td style={{padding:'6px 10px',fontSize:12,textAlign:'right'}}>{cur}{fmt(val*r.qty,3)}</td>
+            </tr>
+          ))}
+          <tr style={{background:'#fff7ed',borderTop:'2px solid #f97316'}}>
+            <td style={{padding:'9px 10px',fontWeight:700,fontSize:13}}>TOTAL</td>
+            <td style={{padding:'9px 10px',fontWeight:700,fontSize:13,textAlign:'right'}}>{cur}{fmt(r.total,4)}</td>
+            <td style={{padding:'9px 10px',fontWeight:700,textAlign:'right'}}>100%</td>
+            <td style={{padding:'9px 10px',fontWeight:800,fontSize:14,textAlign:'right',color:'#c2410c'}}>{cur}{fmt(r.totalProj,2)}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12}}>
+        {[
+          ['Costo / Metro Lineal',`${cur}${fmt(r.cpm,4)}/m`,'#10b981'],
+          ['Total por Costura',`${cur}${fmt(r.total,2)}`,'#3b82f6'],
+          ['Total del Proyecto',`${cur}${fmt(r.totalProj,2)}`,'#f97316'],
+        ].map(([lbl,val,col])=>(
+          <div key={lbl} style={{background:'#f9fafb',borderRadius:10,padding:'11px 13px',borderTop:`3px solid ${col}`}}>
+            <div style={{fontSize:11,color:'#6b7280',marginBottom:3}}>{lbl}</div>
+            <div style={{fontSize:17,fontWeight:800,color:col}}>{val}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
+// ── APP PRINCIPAL ─────────────────────────────────────────────
+function App(){
+  const[db,setDb]=useState(()=>{
+    try{
+      const s=localStorage.getItem('weldCalcDB_v2');
+      if(!s)return DEFAULT_DB;
+      const p=JSON.parse(s);
+      return{...DEFAULT_DB,...p,
+        materials:{...DEFAULT_DB.materials,...p.materials},
+        consumables:{...DEFAULT_DB.consumables,...p.consumables},
+        gases:{...DEFAULT_DB.gases,...p.gases},
+        labor:{...DEFAULT_DB.labor,...p.labor},
+        overhead:{...DEFAULT_DB.overhead,...p.overhead},
+      };
+    }catch{return DEFAULT_DB;}
+  });
+
+  const[inp,setInp]=useState({
+    jointType:'fillet',legSize:'6',thickness:'10',rootOpening:'2',
+    grooveAngle:'60',weldLength:'1000',quantity:'1',
+    material:'carbonSteel',
+    process:'GMAW',consumableKey:'wire_s_12',wireDiameter:'1.2',
+    wireFeedSpeed:'5.0',depRateSMAW:'1.5',
+    gas:'c25',transferMode:'shortCircuit',gasFlowRate:'15',
+    operationFactor:'30',arcVoltage:'26',weldingCurrent:'200',
+  });
+
+  const[showDB,setShowDB]=useState(false);
+  const[valErr,setValErr]=useState('');
+  const[results,setResults]=useState(null);
+
+  useEffect(()=>{try{localStorage.setItem('weldCalcDB_v2',JSON.stringify(db));}catch{}},[db]);
+
+  useEffect(()=>{
+    if(inp.material==='carbonSteel'&&inp.gas==='pure_argon'&&inp.process!=='SMAW'){
+      setValErr('ERROR TÉCNICO: Riesgo de falta de fusión y socavación. El Argón Puro no es compatible con Acero al Carbono en procesos GMAW/FCAW/GTAW.');
+      setResults(null);return;
+    }
+    setValErr('');
+    setResults(calcAll(inp,db));
+  },[inp,db]);
+
+  const upd=useCallback((k,v)=>setInp(p=>({...p,[k]:v})),[]);
+
+  const upDB=useCallback((path,value)=>{
+    setDb(p=>{
+      const nx=JSON.parse(JSON.stringify(p));
+      const parts=path.split('.');
+      let o=nx;
+      for(let i=0;i<parts.length-1;i++)o=o[parts[i]];
+      o[parts[parts.length-1]]=value;
+      return nx;
+    });
+  },[]);
+
+  const resetDB=useCallback(()=>{
+    if(window.confirm('¿Restaurar todos los precios a los valores predeterminados?'))setDb(DEFAULT_DB);
+  },[]);
+
+  const avCons=useMemo(()=>Object.entries(db.consumables).filter(([,v])=>v.process===inp.process),[db.consumables,inp.process]);
+  const avGas=useMemo(()=>inp.process==='SMAW'?[]:Object.entries(db.gases).filter(([,v])=>v.compatible.includes(inp.material)&&v.processes.includes(inp.process)),[db.gases,inp.material,inp.process]);
+
+  useEffect(()=>{
+    const c=Object.entries(db.consumables).filter(([,v])=>v.process===inp.process);
+    if(c.length>0&&!c.find(([k])=>k===inp.consumableKey)){
+      const[fk,fc]=c[0];
+      setInp(p=>({...p,consumableKey:fk,wireDiameter:fc.diameter?String(fc.diameter):p.wireDiameter}));
+    }
+  },[inp.process]);
+
+  useEffect(()=>{
+    const g=Object.entries(db.gases).filter(([,v])=>v.compatible.includes(inp.material)&&v.processes.includes(inp.process));
+    if(g.length>0&&!g.find(([k])=>k===inp.gas))setInp(p=>({...p,gas:g[0][0]}));
+  },[inp.material,inp.process]);
+
+  const cur=db.currency;
+
+  return(
+    <div style={{minHeight:'100vh',background:'#f1f5f9',paddingBottom:results?76:0}}>
+      {/* ─ HEADER ─ */}
+      <header className="nav-hdr no-print">
+        <div style={{maxWidth:1200,margin:'0 auto',padding:'13px 14px',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+          <div style={{flex:1,minWidth:180}}>
+            <div style={{fontWeight:900,fontSize:17,color:'white',lineHeight:1.2}}>⚙️ Calculadora de Soldadura Manual</div>
+            <div style={{fontSize:11,color:'#93c5fd',marginTop:2}}>Alta Precisión · Sistema Métrico · Eficiencia del Operario</div>
+          </div>
+          <div style={{display:'flex',gap:8,flexShrink:0}}>
+            <button className="btn btn-ghost" style={{fontSize:13,padding:'8px 13px',minHeight:40}} onClick={()=>setShowDB(v=>!v)}>
+              {showDB?'✕ Cerrar':'⚙ Precios'}
+            </button>
+            <button className="btn btn-primary" style={{fontSize:13,padding:'8px 13px',minHeight:40}} onClick={()=>window.print()}>
+              🖨 Imprimir
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* ─ PANEL BD ─ */}
+      {showDB&&<DBPanel db={db} upDB={upDB} resetDB={resetDB}/>}
+
+      {/* ─ GRID PRINCIPAL ─ */}
+      <main style={{maxWidth:1200,margin:'0 auto',padding:'14px 12px'}}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(300px,1fr))',gap:14,alignItems:'start'}}>
+
+          {/* Columna 1: Geometría + Material */}
+          <div style={{display:'flex',flexDirection:'column',gap:14}}>
+            <GeometryCard inp={inp} upd={upd}/>
+            <MaterialCard inp={inp} upd={upd} db={db}/>
+          </div>
+
+          {/* Columna 2: Proceso */}
+          <div>
+            <ProcessCard inp={inp} upd={upd} db={db} avCons={avCons} avGas={avGas} valErr={valErr}/>
+          </div>
+
+          {/* Columna 3: Resultados */}
+          <div style={{display:'flex',flexDirection:'column',gap:14}}>
+            {results?(
+              <>
+                <ResultsCard r={results} db={db} cur={cur}/>
+                <ChartCard r={results} cur={cur}/>
+              </>
+            ):(
+              <div className="card" style={{padding:28,textAlign:'center'}}>
+                {valErr?(
+                  <div className="err-box" style={{textAlign:'left'}}>
+                    <div style={{fontWeight:800,color:'#dc2626',fontSize:15,marginBottom:5}}>⛔ Error de Seguridad</div>
+                    <div style={{fontSize:13,color:'#7f1d1d',lineHeight:1.7}}>{valErr}</div>
+                  </div>
+                ):(
+                  <>
+                    <div style={{fontSize:46,marginBottom:10}}>🔧</div>
+                    <div style={{fontWeight:700,color:'#374151',marginBottom:5,fontSize:15}}>Listo para calcular</div>
+                    <div style={{fontSize:13,color:'#9ca3af',lineHeight:1.6}}>Configure la geometría, seleccione el material y los parámetros de proceso para ver el análisis de costos en tiempo real.</div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
+
+      {/* ─ BARRA INFERIOR MÓVIL ─ */}
+      {results&&(
+        <div className="sbar no-print">
+          <div style={{padding:'11px 16px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <div>
+              <div style={{fontSize:10,color:'#93c5fd',fontWeight:600,letterSpacing:'.05em'}}>COSTO / METRO</div>
+              <div style={{fontSize:21,fontWeight:900,color:'#10b981'}}>{cur}{fmt(results.cpm,4)}/m</div>
+            </div>
+            <div style={{width:1,height:36,background:'rgba(255,255,255,.15)'}}/>
+            <div style={{textAlign:'right'}}>
+              <div style={{fontSize:10,color:'#93c5fd',fontWeight:600,letterSpacing:'.05em'}}>TOTAL PROYECTO</div>
+              <div style={{fontSize:21,fontWeight:900,color:'#f97316'}}>{cur}{fmt(results.totalProj,2)}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─ REPORTE IMPRESIÓN ─ */}
+      {results&&<PrintReport r={results} inp={inp} db={db}/>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
