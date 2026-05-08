@@ -19,6 +19,7 @@ from shared.schemas import (
 )
 from shared.exceptions import NotFoundError, BadRequestError
 from shared.config import get_settings
+from shared.audit import record_audit
 
 settings = get_settings()
 
@@ -116,10 +117,13 @@ async def update_invoice(
     if not invoice:
         raise NotFoundError("Invoice", invoice_id)
 
-    for field, value in invoice_data.model_dump(exclude_unset=True).items():
+    update_fields = invoice_data.model_dump(exclude_unset=True)
+    for field, value in update_fields.items():
         setattr(invoice, field, value)
 
     await db.flush()
+    await record_audit(db, "update", "invoice", invoice.id, current_user.id,
+                       new_value=update_fields)
     return invoice
 
 
@@ -141,10 +145,13 @@ async def update_invoice_line(
     if not line:
         raise NotFoundError("InvoiceLine", line_id)
 
-    for field, value in line_data.model_dump(exclude_unset=True).items():
+    line_update_fields = line_data.model_dump(exclude_unset=True)
+    for field, value in line_update_fields.items():
         setattr(line, field, value)
 
     await db.flush()
+    await record_audit(db, "update", "invoice_line", line.id, current_user.id,
+                       new_value=line_update_fields)
     return line
 
 
@@ -175,6 +182,8 @@ async def finalize_invoice(
     invoice.validated_by = current_user.id
 
     await db.flush()
+    await record_audit(db, "validate", "invoice", invoice.id, current_user.id,
+                       new_value={"status": "validated"})
     return invoice
 
 
@@ -192,6 +201,8 @@ async def reject_invoice(
 
     invoice.status = "rejected"
     await db.flush()
+    await record_audit(db, "reject", "invoice", invoice.id, current_user.id,
+                       new_value={"status": "rejected"}, notes=reason)
     return invoice
 
 
@@ -260,6 +271,8 @@ async def assign_material_to_line(
         db.add(alias)
 
     await db.flush()
+    await record_audit(db, "homologate", "invoice_line", line.id, current_user.id,
+                       new_value={"material_id": assign_data.material_id, "status": "homologated"})
     return line
 
 
