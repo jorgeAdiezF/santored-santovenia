@@ -1,8 +1,14 @@
 import sys
 import os
+import importlib.util
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+_SERVICE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+_BACKEND_DIR = os.path.abspath(os.path.join(_SERVICE_DIR, ".."))
+
+if _BACKEND_DIR not in sys.path:
+    sys.path.insert(0, _BACKEND_DIR)
+if _SERVICE_DIR not in sys.path:
+    sys.path.insert(0, _SERVICE_DIR)
 
 import pytest
 import pytest_asyncio
@@ -15,6 +21,19 @@ from shared.auth import get_current_user
 from shared.models import User, Role
 
 TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
+
+_MODULE_NAME = "analytics_service_main"
+
+
+def _get_app():
+    if _MODULE_NAME not in sys.modules:
+        spec = importlib.util.spec_from_file_location(
+            _MODULE_NAME, os.path.join(_SERVICE_DIR, "main.py")
+        )
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[_MODULE_NAME] = mod
+        spec.loader.exec_module(mod)
+    return sys.modules[_MODULE_NAME].app
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -49,7 +68,7 @@ def make_mock_user(role_name: str = "admin") -> User:
 
 @pytest_asyncio.fixture
 async def client(db_session: AsyncSession):
-    from main import app
+    app = _get_app()
 
     async def _override_db():
         yield db_session

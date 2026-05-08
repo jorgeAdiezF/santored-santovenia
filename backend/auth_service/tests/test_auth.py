@@ -156,7 +156,20 @@ async def test_create_user_duplicate_username(
 
 async def test_delete_user(client: AsyncClient, db_session: AsyncSession):
     role = await _create_role(db_session, name="reviewer")
+    # Insert a placeholder user at id=1 first so the next user gets a different id
+    # (the mock current_user has id=1 and the endpoint refuses self-deletion).
+    placeholder = User(
+        id=1,
+        username="mockuser",
+        password_hash=hash_password("x"),
+        active=True,
+    )
+    db_session.add(placeholder)
+    await db_session.flush()
+
     target = await _create_user(db_session, username="todelete", role=role)
+    # target.id must differ from 1
+    assert target.id != 1
 
     response = await client.delete(f"/users/{target.id}")
     assert response.status_code == 200
