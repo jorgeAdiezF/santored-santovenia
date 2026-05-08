@@ -1,36 +1,89 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { useAuthStore } from '../store/auth';
 
+const BASE_URL = import.meta.env.VITE_API_URL || '/api';
+
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL: BASE_URL,
+  headers: { 'Content-Type': 'application/json' },
 });
 
-// Request interceptor to add JWT token
-apiClient.interceptors.request.use(
-  (config) => {
-    const token = useAuthStore.getState().token;
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
+// Attach JWT to every request
+apiClient.interceptors.request.use((config) => {
+  const token = useAuthStore.getState().token;
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
-);
+  return config;
+});
 
-// Response interceptor to handle 401
+// Silent token refresh on 401
+let isRefreshing = false;
+let pendingQueue: Array<{ resolve: (token: string) => void; reject: (err: unknown) => void }> = [];
+
+const flushQueue = (token: string | null, error: unknown = null) => {
+  pendingQueue.forEach(({ resolve, reject }) => {
+    if (token) resolve(token);
+    else reject(error);
+  });
+  pendingQueue = [];
+};
+
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      useAuthStore.getState().logout();
-      window.location.href = '/login';
+  async (error: AxiosError) => {
+    const original = error.config as typeof error.config & { _retry?: boolean };
+
+    if (error.response?.status !== 401 || original?._retry) {
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
+
+    const { refreshToken, logout, setToken } = useAuthStore.getState();
+
+    if (!refreshToken) {
+      logout();
+      window.location.href = '/login';
+      return Promise.reject(error);
+    }
+
+    if (isRefreshing) {
+      return new Promise((resolve, reject) => {
+        pendingQueue.push({
+          resolve: (token) => {
+            if (original) {
+              original.headers = original.headers ?? {};
+              original.headers.Authorization = `Bearer ${token}`;
+            }
+            resolve(apiClient(original!));
+          },
+          reject,
+        });
+      });
+    }
+
+    isRefreshing = true;
+    original!._retry = true;
+
+    try {
+      const { data } = await axios.post(`${BASE_URL}/auth/refresh`, {
+        refresh_token: refreshToken,
+      });
+      const newToken: string = data.access_token;
+      setToken(newToken);
+      flushQueue(newToken);
+      if (original) {
+        original.headers = original.headers ?? {};
+        original.headers.Authorization = `Bearer ${newToken}`;
+      }
+      return apiClient(original!);
+    } catch (refreshError) {
+      flushQueue(null, refreshError);
+      logout();
+      window.location.href = '/login';
+      return Promise.reject(refreshError);
+    } finally {
+      isRefreshing = false;
+    }
   }
 );
 

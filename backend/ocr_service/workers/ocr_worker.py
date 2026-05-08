@@ -100,34 +100,16 @@ def find_or_create_provider(session, tax_id: str, provider_name: str = None):
     return _find_or_create()
 
 
-def publish_homologation_job(invoice_id: int, line_ids: list) -> None:
-    """Publish homologation job to queue."""
-    import aio_pika
-    import asyncio
-
-    async def _publish():
-        try:
-            connection = await aio_pika.connect_robust(settings.rabbitmq_url)
-            async with connection:
-                channel = await connection.channel()
-                await channel.declare_queue("homologation_jobs", durable=True)
-                await channel.default_exchange.publish(
-                    aio_pika.Message(
-                        body=json.dumps({
-                            "invoice_id": invoice_id,
-                            "line_ids": line_ids,
-                        }).encode(),
-                        delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
-                    ),
-                    routing_key="homologation_jobs",
-                )
-        except Exception as e:
-            print(f"Warning: Failed to publish homologation job: {str(e)}")
-
+def trigger_homologation(invoice_id: int, line_ids: list) -> None:
+    """Trigger homologation Celery task for extracted invoice lines."""
     try:
-        asyncio.run(_publish())
-    except Exception:
-        pass
+        celery_app.send_task(
+            "homologation_worker.process_invoice_lines",
+            args=[invoice_id, line_ids],
+            queue="homologation",
+        )
+    except Exception as e:
+        print(f"Warning: Failed to trigger homologation for invoice {invoice_id}: {e}")
 
 
 @celery_app.task(name="ocr_worker.process_segment", bind=True, max_retries=3)
@@ -232,7 +214,7 @@ def process_segment(self, document_id: int, segment_id: int):
             )
             await session.commit()
 
-            publish_homologation_job(invoice.id, line_ids)
+            trigger_homologation(invoice.id, line_ids)
 
             return {
                 "segment_id": segment_id,

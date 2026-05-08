@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from datetime import datetime, date
 
-import aio_pika
+from celery import Celery
 
 from shared.database import get_db
 from shared.models import Document, Page, DetectedDoc, User
@@ -28,9 +28,11 @@ settings = get_settings()
 
 app = FastAPI(title="Document Service", version="1.0.0")
 
+celery_app = Celery(broker=settings.celery_broker_url, backend=settings.celery_result_backend)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.get_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -42,21 +44,15 @@ async def health():
     return {"status": "ok", "service": "document_service"}
 
 
-async def publish_to_queue(queue_name: str, message: dict) -> None:
+def trigger_segmentation(document_id: int) -> None:
     try:
-        connection = await aio_pika.connect_robust(settings.rabbitmq_url)
-        async with connection:
-            channel = await connection.channel()
-            await channel.declare_queue(queue_name, durable=True)
-            await channel.default_exchange.publish(
-                aio_pika.Message(
-                    body=json.dumps(message).encode(),
-                    delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
-                ),
-                routing_key=queue_name,
-            )
+        celery_app.send_task(
+            "segmentation_worker.segment_document",
+            args=[document_id],
+            queue="segmentation",
+        )
     except Exception as e:
-        print(f"Warning: Failed to publish to queue {queue_name}: {str(e)}")
+        print(f"Warning: Failed to trigger segmentation for document {document_id}: {e}")
 
 
 @app.post("/documents/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
@@ -118,11 +114,7 @@ async def upload_document(
 
     await db.flush()
 
-    await publish_to_queue("segmentation_jobs", {
-        "document_id": document.id,
-        "filename": filename,
-        "file_hash": file_hash,
-    })
+    trigger_segmentation(document.id)
 
     return document
 

@@ -1,6 +1,6 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
-from typing import Optional
+from typing import List
 
 
 class Settings(BaseSettings):
@@ -39,10 +39,18 @@ class Settings(BaseSettings):
     destinations_service_url: str = "http://localhost:8008"
     analytics_service_url: str = "http://localhost:8009"
 
+    # CORS — comma-separated origins, e.g. "http://localhost:3000,https://app.example.com"
+    cors_origins: str = "http://localhost:3000"
+
     # App
     debug: bool = False
     log_level: str = "INFO"
     environment: str = "development"
+
+    def get_cors_origins(self) -> List[str]:
+        if self.environment == "development":
+            return ["*"]
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
     class Config:
         env_file = ".env"

@@ -133,35 +133,16 @@ def detect_invoice_boundaries(pages_text: list) -> list:
     return segments
 
 
-def publish_ocr_job(document_id: int, segment_id: int) -> None:
-    """Publish an OCR job to the queue."""
-    import aio_pika
-    import asyncio
-
-    async def _publish():
-        try:
-            connection = await aio_pika.connect_robust(settings.rabbitmq_url)
-            async with connection:
-                channel = await connection.channel()
-                await channel.declare_queue("ocr_jobs", durable=True)
-                await channel.default_exchange.publish(
-                    aio_pika.Message(
-                        body=json.dumps({
-                            "document_id": document_id,
-                            "segment_id": segment_id,
-                        }).encode(),
-                        delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
-                    ),
-                    routing_key="ocr_jobs",
-                )
-        except Exception as e:
-            print(f"Warning: Failed to publish OCR job: {str(e)}")
-
+def trigger_ocr(document_id: int, segment_id: int) -> None:
+    """Trigger OCR Celery task for a detected segment."""
     try:
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(_publish())
-    except RuntimeError:
-        asyncio.run(_publish())
+        celery_app.send_task(
+            "ocr_worker.process_segment",
+            args=[document_id, segment_id],
+            queue="ocr",
+        )
+    except Exception as e:
+        print(f"Warning: Failed to trigger OCR for segment {segment_id}: {e}")
 
 
 @celery_app.task(name="segmentation_worker.segment_document", bind=True, max_retries=3)
@@ -224,7 +205,7 @@ def segment_document(self, document_id: int):
             await session.commit()
 
             for segment_id in segment_ids:
-                publish_ocr_job(document_id, segment_id)
+                trigger_ocr(document_id, segment_id)
 
             return {
                 "document_id": document_id,
