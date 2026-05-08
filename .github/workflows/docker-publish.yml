@@ -1,0 +1,43 @@
+name: Publish Docker Images
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - auth_service
+          - document_service
+          - segmentation_service
+          - ocr_service
+          - materials_service
+          - homologation_service
+          - review_service
+          - destinations_service
+          - analytics_service
+          - api_gateway
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.service }}
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: backend/${{ matrix.service }}/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/${{ matrix.service }}:${{ github.ref_name }}
+            ghcr.io/${{ github.repository }}/${{ matrix.service }}:latest

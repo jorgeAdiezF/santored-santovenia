@@ -19,6 +19,7 @@ from shared.schemas import (
 )
 from shared.exceptions import NotFoundError, ConflictError
 from shared.config import get_settings
+from shared.audit import record_audit
 
 settings = get_settings()
 
@@ -105,6 +106,9 @@ async def create_material(
     db.add(material)
     await db.flush()
 
+    await record_audit(db, "create", "material", material.id, current_user.id,
+                       new_value={"name": material.normalized_description})
+
     result = await db.execute(
         select(MaterialMaster).options(selectinload(MaterialMaster.aliases)).where(MaterialMaster.id == material.id)
     )
@@ -138,10 +142,13 @@ async def update_material(
     if not material:
         raise NotFoundError("Material", material_id)
 
-    for field, value in material_data.model_dump(exclude_unset=True).items():
+    material_update_fields = material_data.model_dump(exclude_unset=True)
+    for field, value in material_update_fields.items():
         setattr(material, field, value)
 
     await db.flush()
+    await record_audit(db, "update", "material", material_id, current_user.id,
+                       new_value=material_update_fields)
 
     result = await db.execute(
         select(MaterialMaster).options(selectinload(MaterialMaster.aliases)).where(MaterialMaster.id == material_id)
@@ -162,6 +169,8 @@ async def delete_material(
 
     material.active = False
     await db.flush()
+    await record_audit(db, "delete", "material", material_id, current_user.id,
+                       old_value={"name": material.normalized_description})
     return MessageResponse(message=f"Material {material_id} deactivated")
 
 
@@ -263,6 +272,9 @@ async def create_provider(
     db.add(provider)
     await db.flush()
 
+    await record_audit(db, "create", "provider", provider.id, current_user.id,
+                       new_value={"fiscal_name": provider.fiscal_name, "tax_id": provider.tax_id})
+
     result = await db.execute(
         select(Provider).options(selectinload(Provider.aliases)).where(Provider.id == provider.id)
     )
@@ -296,10 +308,13 @@ async def update_provider(
     if not provider:
         raise NotFoundError("Provider", provider_id)
 
-    for field, value in provider_data.model_dump(exclude_unset=True).items():
+    provider_update_fields = provider_data.model_dump(exclude_unset=True)
+    for field, value in provider_update_fields.items():
         setattr(provider, field, value)
 
     await db.flush()
+    await record_audit(db, "update", "provider", provider_id, current_user.id,
+                       new_value=provider_update_fields)
 
     result = await db.execute(
         select(Provider).options(selectinload(Provider.aliases)).where(Provider.id == provider_id)

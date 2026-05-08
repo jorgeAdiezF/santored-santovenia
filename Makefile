@@ -24,3 +24,37 @@ test:
 clean:
 	docker-compose down -v --remove-orphans
 	docker system prune -f
+
+# Development
+dev-backend:
+	cd backend && uvicorn auth_service.main:app --reload --port 8001 &
+
+# Testing
+test-unit:
+	pytest backend/ -v --tb=short -x
+
+test-coverage:
+	pytest backend/ --cov=backend --cov-report=html --cov-report=term-missing
+
+# Docker helpers
+ps:
+	docker-compose ps
+
+restart:
+	docker-compose restart $(service)
+
+scale-workers:
+	docker-compose up -d --scale segmentation_worker=2 --scale ocr_worker=3
+
+# Utilities
+shell-db:
+	docker-compose exec postgres psql -U invoices_user -d invoices_db
+
+shell-redis:
+	docker-compose exec redis redis-cli
+
+minio-init:
+	docker-compose run --rm minio_init
+
+flower:
+	docker-compose exec segmentation_worker celery -A workers.segmentation_worker.celery_app flower --port=5555

@@ -22,6 +22,7 @@ from shared.schemas import (
 )
 from shared.exceptions import NotFoundError, ConflictError, UnauthorizedError
 from shared.config import get_settings
+from shared.audit import record_audit
 
 settings = get_settings()
 
@@ -159,6 +160,9 @@ async def create_user(
     db.add(new_user)
     await db.flush()
 
+    await record_audit(db, "create", "user", new_user.id, current_user.id,
+                       new_value={"username": new_user.username, "email": new_user.email})
+
     result = await db.execute(
         select(User).options(selectinload(User.role)).where(User.id == new_user.id)
     )
@@ -214,6 +218,8 @@ async def update_user(
         user.active = user_data.active
 
     await db.flush()
+    await record_audit(db, "update", "user", user_id, current_user.id,
+                       new_value=user_data.model_dump(exclude_unset=True, exclude={"password"}))
 
     result = await db.execute(
         select(User).options(selectinload(User.role)).where(User.id == user_id)
@@ -240,6 +246,8 @@ async def delete_user(
 
     user.active = False
     await db.flush()
+    await record_audit(db, "delete", "user", user_id, current_user.id,
+                       old_value={"username": user.username})
 
     return MessageResponse(message=f"User {user_id} deactivated successfully")
 
