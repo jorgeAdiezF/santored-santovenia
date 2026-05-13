@@ -65,39 +65,60 @@ def run_ocr_on_pages(pages: list) -> str:
     return "\n".join(full_text)
 
 
-def find_or_create_provider(session, tax_id: str, provider_name: str = None):
-    """Find existing provider by tax_id or create new one."""
-    import asyncio
+FUZZY_PROVIDER_THRESHOLD = 80  # rapidfuzz score 0-100
+
+
+async def find_or_create_provider(session, tax_id: str, provider_name: str = None):
+    """Find existing provider by tax_id, fuzzy name match, or create new one."""
     from sqlalchemy import select
     from shared.models import Provider
 
-    async def _find_or_create():
-        if tax_id:
-            result = await session.execute(
-                select(Provider).where(Provider.tax_id == tax_id)
-            )
-            provider = result.scalar_one_or_none()
-            if provider:
-                return provider
-
-        if provider_name:
-            result = await session.execute(
-                select(Provider).where(Provider.fiscal_name.ilike(f"%{provider_name}%"))
-            )
-            provider = result.scalar_one_or_none()
-            if provider:
-                return provider
-
-        new_provider = Provider(
-            fiscal_name=provider_name or f"Provider_{tax_id}",
-            tax_id=tax_id,
-            active=True,
+    if tax_id:
+        result = await session.execute(
+            select(Provider).where(Provider.tax_id == tax_id)
         )
-        session.add(new_provider)
-        await session.flush()
-        return new_provider
+        provider = result.scalar_one_or_none()
+        if provider:
+            return provider
 
-    return _find_or_create()
+    if provider_name:
+        # 1. Exact substring match
+        result = await session.execute(
+            select(Provider).where(Provider.fiscal_name.ilike(f"%{provider_name}%"))
+        )
+        provider = result.scalar_one_or_none()
+        if provider:
+            return provider
+
+        # 2. Fuzzy match against all providers
+        try:
+            from rapidfuzz import process as fuzz_process, fuzz
+            all_result = await session.execute(select(Provider))
+            all_providers = all_result.scalars().all()
+            if all_providers:
+                names = [p.fiscal_name for p in all_providers]
+                best = fuzz_process.extractOne(
+                    provider_name,
+                    names,
+                    scorer=fuzz.WRatio,
+                    score_cutoff=FUZZY_PROVIDER_THRESHOLD,
+                )
+                if best:
+                    matched_name = best[0]
+                    for p in all_providers:
+                        if p.fiscal_name == matched_name:
+                            return p
+        except Exception as fuzz_exc:
+            print(f"Fuzzy provider match skipped: {fuzz_exc}")
+
+    new_provider = Provider(
+        fiscal_name=provider_name or f"Provider_{tax_id}",
+        tax_id=tax_id,
+        active=True,
+    )
+    session.add(new_provider)
+    await session.flush()
+    return new_provider
 
 
 def trigger_homologation(invoice_id: int, line_ids: list) -> None:
@@ -121,6 +142,8 @@ def process_segment(self, document_id: int, segment_id: int):
     from shared.models import DetectedDoc, Invoice, InvoiceLine, Page, Provider
     from services.image_preprocessor import preprocess_image
     from services.text_extractor import extract_header, extract_table_lines
+    from services.pdf_table_extractor import DigitalPDFExtractor, ScannedPDFExtractor
+    from services.quality import item_quality_flags, confidence_from_flags
 
     async def _run():
         engine = create_async_engine(settings.database_url, echo=False)
@@ -150,17 +173,110 @@ def process_segment(self, document_id: int, segment_id: int):
                     print(f"Preprocessing error on page {page_num}: {str(e)}")
                     preprocessed_pages.append((page_num, image_bytes))
 
+            # ----------------------------------------------------------------
+            # Determine if we have the original PDF bytes available.
+            # download_segment_pages returns PNG images from MinIO; to use
+            # pdfplumber we need to check for a PDF object stored alongside.
+            # We try to fetch the original PDF from MinIO and attempt
+            # DigitalPDFExtractor first, falling back gracefully.
+            # ----------------------------------------------------------------
+            table_lines = []
+            pdf_extraction_attempted = False
+
+            try:
+                from minio import Minio
+                minio_client = Minio(
+                    settings.minio_url,
+                    access_key=settings.minio_access_key,
+                    secret_key=settings.minio_secret_key,
+                    secure=settings.minio_secure,
+                )
+                pdf_object_name = f"documents/{document_id}/original.pdf"
+                try:
+                    pdf_response = minio_client.get_object(settings.minio_bucket, pdf_object_name)
+                    pdf_bytes = pdf_response.read()
+                    pdf_response.close()
+                    pdf_response.release_conn()
+
+                    digital_extractor = DigitalPDFExtractor()
+                    if digital_extractor.can_extract(pdf_bytes):
+                        pdf_extraction_attempted = True
+                        digital_lines = digital_extractor.extract_invoice_lines(pdf_bytes)
+                        high_confidence_lines = [
+                            ln for ln in digital_lines
+                            if ln.get("extraction_confidence", 0) > 0.6
+                        ]
+                        if high_confidence_lines:
+                            table_lines = digital_lines
+                            print(
+                                f"[segment {segment_id}] DigitalPDFExtractor: "
+                                f"{len(table_lines)} lines extracted"
+                            )
+                except Exception as pdf_exc:
+                    print(f"[segment {segment_id}] PDF fetch/digital extract skipped: {pdf_exc}")
+            except Exception as minio_exc:
+                print(f"[segment {segment_id}] MinIO PDF access skipped: {minio_exc}")
+
+            # ----------------------------------------------------------------
+            # Fallback A: run Tesseract on preprocessed page images and use
+            # the coordinate-based ScannedPDFExtractor on each page image.
+            # ----------------------------------------------------------------
             full_text = run_ocr_on_pages(preprocessed_pages)
 
+            if not table_lines:
+                # Try ScannedPDFExtractor on each preprocessed page
+                scanned_extractor = ScannedPDFExtractor()
+                scanned_lines = []
+                line_offset = 0
+                for _page_num, img_bytes in preprocessed_pages:
+                    try:
+                        page_lines = scanned_extractor.extract_invoice_lines_from_image(img_bytes)
+                        for ln in page_lines:
+                            ln["line_number"] += line_offset
+                        scanned_lines.extend(page_lines)
+                        line_offset += len(page_lines)
+                    except Exception as scan_exc:
+                        print(f"[segment {segment_id}] ScannedPDFExtractor error: {scan_exc}")
+
+                if scanned_lines:
+                    table_lines = scanned_lines
+                    print(
+                        f"[segment {segment_id}] ScannedPDFExtractor: "
+                        f"{len(table_lines)} lines extracted"
+                    )
+
+            # ----------------------------------------------------------------
+            # Fallback B: original regex-based extraction from plain OCR text
+            # ----------------------------------------------------------------
+            if not table_lines:
+                table_lines = extract_table_lines(full_text)
+                print(
+                    f"[segment {segment_id}] regex extract_table_lines: "
+                    f"{len(table_lines)} lines extracted"
+                )
+
             header = extract_header(full_text)
-            table_lines = extract_table_lines(full_text)
+
+            # ----------------------------------------------------------------
+            # Apply quality flags to all extracted lines; update confidence
+            # ----------------------------------------------------------------
+            for ln in table_lines:
+                flags = item_quality_flags(
+                    raw_description=ln.get("original_description"),
+                    canonical_name=None,  # not yet homologated at this stage
+                    quantity=ln.get("quantity"),
+                    unit_price=ln.get("unit_price"),
+                    total_price=ln.get("subtotal"),
+                )
+                ln["extraction_confidence"] = confidence_from_flags(flags)
 
             provider_id = None
-            if header.get("tax_id"):
-                result = await session.execute(
-                    select(Provider).where(Provider.tax_id == header["tax_id"])
+            if header.get("tax_id") or header.get("provider_name"):
+                provider = await find_or_create_provider(
+                    session,
+                    tax_id=header.get("tax_id"),
+                    provider_name=header.get("provider_name"),
                 )
-                provider = result.scalar_one_or_none()
                 if provider:
                     provider_id = provider.id
 

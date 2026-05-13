@@ -9,12 +9,84 @@ CIF_PATTERN = re.compile(r"\b[ABCDEFGHJKLMNPQRSUVW]\d{7}[A-J0-9]\b", re.IGNORECA
 NIF_PATTERN = re.compile(r"\b\d{8}[A-Z]\b", re.IGNORECASE)
 NIE_PATTERN = re.compile(r"\b[XYZ]\d{7}[A-Z]\b", re.IGNORECASE)
 
-# Invoice number patterns
+# Invoice number patterns – extended with additional formats from real Spanish invoices
 INVOICE_NUMBER_PATTERNS = [
+    # Original patterns
     re.compile(r"(?:factura|fra|invoice)[:\s#nº\.]*([A-Z0-9\-\/]+)", re.IGNORECASE),
     re.compile(r"(?:n[uú]mero|n[oº])[:\s\.]*([A-Z0-9\-\/]+)", re.IGNORECASE),
     re.compile(r"(?:num\.?|no\.?)[:\s]*([A-Z0-9\-\/]{3,20})", re.IGNORECASE),
+    # Additional patterns from real Spanish invoice formats
+    re.compile(r"(?:n[uú]m(?:ero)?\.?\s+(?:de\s+)?factura)[:\s#nº\.]*([A-Z0-9\-\/]+)", re.IGNORECASE),
+    re.compile(r"(?:fra\.?|fac\.?|f\.?)[:\s#nº\.]*([A-Z0-9\-\/]{3,25})", re.IGNORECASE),
+    re.compile(r"(?:albar[aá]n|albaran)[:\s#nº\.]*([A-Z0-9\-\/]+)", re.IGNORECASE),
+    re.compile(r"(?:pedido|order)[:\s#nº\.]*([A-Z0-9\-\/]+)", re.IGNORECASE),
+    re.compile(r"\bSerie[:\s]+([A-Z])\s+N[uú]m(?:ero)?[:\s]+(\d+)", re.IGNORECASE),
+    re.compile(r"(?:referencia|ref\.?)[:\s]*([A-Z0-9\-\/]{4,25})", re.IGNORECASE),
+    re.compile(r"\b([A-Z]{1,3}[-\/]?\d{4,10})\b"),                 # e.g. F-2024001, A/20240123
+    re.compile(r"\b(\d{4}[-\/]\d{3,8})\b"),                        # e.g. 2024/00123
+    re.compile(r"(?:documento|doc\.?)[:\s#nº\.]*([A-Z0-9\-\/]+)", re.IGNORECASE),
+    re.compile(r"(?:recibo|ticket)[:\s#nº\.]*([A-Z0-9\-\/]+)", re.IGNORECASE),
+    re.compile(r"(?:nota\s+de\s+cargo|nota\s+cargo)[:\s#nº\.]*([A-Z0-9\-\/]+)", re.IGNORECASE),
+    re.compile(r"(?:nota\s+de\s+abono|nota\s+abono)[:\s#nº\.]*([A-Z0-9\-\/]+)", re.IGNORECASE),
+    re.compile(r"(?:rectificativa|rectificativa\s+n[uú]m)[:\s#nº\.]*([A-Z0-9\-\/]+)", re.IGNORECASE),
+    re.compile(r"(?:simplificada|factura\s+simplificada)[:\s#nº\.]*([A-Z0-9\-\/]+)", re.IGNORECASE),
+    re.compile(r"(?:proforma|pro-forma)[:\s#nº\.]*([A-Z0-9\-\/]+)", re.IGNORECASE),
+    re.compile(r"(?:invoice\s+number|invoice\s+no\.?)[:\s#]*([A-Z0-9\-\/]+)", re.IGNORECASE),
+    re.compile(r"(?:bill\s+number|bill\s+no\.?)[:\s#]*([A-Z0-9\-\/]+)", re.IGNORECASE),
+    re.compile(r"\bN[ºo°]?\s*[:.]?\s*([A-Z]{0,3}\d{4,12}[A-Z]?)\b", re.IGNORECASE),
+    re.compile(r"(?:n[uú]m\.\s*doc(?:umento)?)[:\s]*([A-Z0-9\-\/]+)", re.IGNORECASE),
+    re.compile(r"(?:c[oó]digo\s+(?:de\s+)?factura)[:\s]*([A-Z0-9\-\/]+)", re.IGNORECASE),
+    re.compile(r"(?:folio)[:\s#nº\.]*([A-Z0-9\-\/]+)", re.IGNORECASE),
+    re.compile(r"(?:identificador|id\.?)[:\s]*([A-Z0-9\-\/]{5,25})", re.IGNORECASE),
+    re.compile(r"(?:liquidaci[oó]n)[:\s#nº\.]*([A-Z0-9\-\/]+)", re.IGNORECASE),
+    re.compile(r"\b([A-Z]{2,4}\d{2}[-\/]\d{4,8})\b"),              # e.g. FA24/00001
 ]
+
+# ---------------------------------------------------------------------------
+# Known supplier patterns trained on real Spanish invoices
+# ---------------------------------------------------------------------------
+
+KNOWN_SUPPLIERS = [
+    (re.compile(r"SAINT[-\s]?GOBAIN\s+IDAPLAC|DISTRIPLAC", re.I), "SAINT-GOBAIN IDAPLAC, S.L.U."),
+    (re.compile(r"LEASYS\s+S\.?P\.?A", re.I), "LEASYS S.P.A. Sucursal en España"),
+    (re.compile(r"FUNDICI[ÓO]N\s+Y\s+FORJA\s+PACHECO|PACHECO\s+FORJA", re.I), "Fundición y Forja Pacheco, S.L."),
+    (re.compile(r"BRICO\s*DEPOT|EURO\s*DEPOT|BRICOMAN|BRICOLAJE\s+BRICOMAN|OBRAMAT", re.I), "BRICOLAJE BRICOMAN, S.L.U."),
+    (re.compile(r"ORANGE\s+ESPAGNE", re.I), "Orange Espagne, S.A."),
+    (re.compile(r"SUMINISTROS\s+INDUSTRIALES\s+74", re.I), "SUMINISTROS INDUSTRIALES 74, S.L."),
+    (re.compile(r"\bERREKA\b|MATZ[-\s]?ERREKA", re.I), "Matz-Erreka, S. Coop"),
+    (re.compile(r"AXIS\s+LE[OÓ]N", re.I), "AXIS LEON, S.L."),
+    (re.compile(r"MARCELIANO\s+CUESTA|NOTARIO", re.I), "MARCELIANO CUESTA MTNZ-AGUSTIN CABRERA BLANCO, S.C."),
+    (re.compile(r"LEROY\s+MERLIN", re.I), "Leroy Merlin España, S.L.U."),
+    (re.compile(r"COMERCIAL\s+DE\s+LAMINADOS|LAMINADOS\s+IB[EÉ]RICA", re.I), "Comercial de Laminados Ibérica, S.A.U."),
+    (re.compile(r"HIERROS\s+Y\s+TRANSFORMADOS\s+DE\s+LE[OÓ]N", re.I), "HIERROS Y TRANSFORMADOS DE LEÓN, S.L."),
+    (re.compile(r"METALES\s+SANTA\s+OLAJA|SERIE\s+ALFIL|Ctra\.\s*Villarroa[ñn]e", re.I), "Metales Santa Olaja, S.A."),
+    (re.compile(r"FERRETERIA\s+BANEZANA|FERRETER[IÍ]A\s+BA[ÑN]EZANA", re.I), "FERRETERÍA BAÑEZANA"),
+    (re.compile(r"REPSOL|E\.S\.\s*ARMUNIA|TERA\s+GASOLINERA", re.I), "Repsol Soluciones Energéticas, S.A."),
+    (re.compile(r"SABADELL|BANCO\s+DE\s+SABADELL", re.I), "Banco de Sabadell, S.A."),
+    (re.compile(r"\bCRENGO\s+ESPAGNE\b", re.I), "Crengo Espagne, S.A.U."),
+    (re.compile(r"W[ÜU]RTH\s+ESPA[ÑN]A", re.I), "WÜRTH ESPAÑA, S.A."),
+    (re.compile(r"LA\s+FLOR\s+DEL\s+ORBIGO", re.I), "LA FLOR DEL ORBIGO, S.L."),
+    (re.compile(r"HERGADI\s*S\.?L\.?", re.I), "HERGADI, S.L."),
+    (re.compile(r"Alquiler\s+y\s+venta\s+de\s+maquinaria\s+74", re.I), "Alquiler y venta de maquinaria 74, S.L."),
+    (re.compile(r"CUMBRE\s+LEON|Rodriguez\s+del\s+Valle", re.I), "CUMBRE LEON ASESORES"),
+]
+
+
+def extract_supplier_name(text: str) -> Optional[str]:
+    """
+    Try known supplier patterns first, then fall back to heuristics.
+    Returns canonical supplier name or None.
+    """
+    # 1. Try known suppliers
+    for pattern, canonical in KNOWN_SUPPLIERS:
+        if pattern.search(text):
+            return canonical
+    # 2. Try "Proveedor: X" pattern
+    m = re.search(r"Proveedor\s*:\s*(.+)", text, re.IGNORECASE)
+    if m:
+        return m.group(1).strip()[:100]
+    # 3. Return None (let the caller handle)
+    return None
 
 # Date patterns
 DATE_PATTERNS = [
@@ -141,7 +213,7 @@ def extract_header(text: str) -> Dict[str, Any]:
     }
 
     confidence_factors = 0
-    total_factors = 5
+    total_factors = 6  # increased to account for provider detection
 
     tax_id = extract_tax_id(text)
     if tax_id:
@@ -176,6 +248,19 @@ def extract_header(text: str) -> Dict[str, Any]:
 
     if "$" in text or "USD" in text:
         result["currency"] = "USD"
+
+    # Supplier detection via known-supplier patterns and heuristics
+    provider_name = extract_supplier_name(text)
+    if provider_name:
+        result["provider_name"] = provider_name
+        confidence_factors += 1
+    else:
+        # Fall back to legacy PROVIDER_PATTERNS if extract_supplier_name found nothing
+        for pattern in PROVIDER_PATTERNS:
+            match = pattern.search(text)
+            if match:
+                result["provider_name"] = match.group(1).strip()[:100]
+                break
 
     result["confidence"] = confidence_factors / total_factors
 
