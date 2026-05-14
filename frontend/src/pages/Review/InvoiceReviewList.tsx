@@ -31,7 +31,7 @@ const statusColors: Record<InvoiceStatus, string> = {
 };
 
 const statusOptions = [
-  { value: '', label: 'All Statuses' },
+  { value: '', label: 'Todos los estados' },
   { value: 'pending_review', label: 'Pending Review' },
   { value: 'under_review', label: 'Under Review' },
   { value: 'approved', label: 'Approved' },
@@ -53,13 +53,13 @@ export default function InvoiceReviewList() {
   const { data: providersData } = useProviders({ size: 200 });
 
   const providerOptions = [
-    { value: '', label: 'All Providers' },
+    { value: '', label: 'Todos los proveedores' },
     ...(providersData?.items || []).map((p) => ({ value: p.id, label: p.name })),
   ];
 
   const columns: ColumnsType<Invoice> = [
     {
-      title: 'Invoice #',
+      title: 'Nº factura',
       dataIndex: 'invoice_number',
       key: 'invoice_number',
       render: (num, record) => (
@@ -67,12 +67,12 @@ export default function InvoiceReviewList() {
       ),
     },
     {
-      title: 'Provider',
+      title: 'Proveedor',
       key: 'provider',
       render: (_, record) => record.provider?.name || <Tag>Unknown</Tag>,
     },
     {
-      title: 'Invoice Date',
+      title: 'Fecha',
       dataIndex: 'invoice_date',
       key: 'invoice_date',
       width: 130,
@@ -90,21 +90,21 @@ export default function InvoiceReviewList() {
           : '—',
     },
     {
-      title: 'Lines',
+      title: 'Líneas',
       key: 'lines',
       width: 70,
       align: 'center',
       render: (_, r) => r.lines?.length || 0,
     },
     {
-      title: 'Confidence',
+      title: 'Confianza',
       dataIndex: 'confidence',
       key: 'confidence',
       width: 110,
       render: (c) => <ConfidenceBar value={c || 0} />,
     },
     {
-      title: 'Status',
+      title: 'Estado',
       dataIndex: 'status',
       key: 'status',
       width: 140,
@@ -115,7 +115,7 @@ export default function InvoiceReviewList() {
       ),
     },
     {
-      title: 'Actions',
+      title: 'Acciones',
       key: 'actions',
       width: 80,
       render: (_, record) => (
@@ -134,7 +134,7 @@ export default function InvoiceReviewList() {
   return (
     <div>
       <Title level={3} style={{ marginBottom: 16 }}>
-        Review Queue
+        Cola de revisión
       </Title>
 
       <Card style={{ marginBottom: 16 }}>

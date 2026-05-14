@@ -179,19 +179,19 @@ export default function AnalyticsDashboard() {
 
   const statsColumns: ColumnsType<MaterialStats> = [
     {
-      title: 'Code',
+      title: 'Código',
       dataIndex: 'master_code',
       key: 'master_code',
       width: 120,
     },
     {
-      title: 'Description',
+      title: 'Descripción',
       dataIndex: 'normalized_description',
       key: 'description',
       ellipsis: true,
     },
     {
-      title: 'Total Spend',
+      title: 'Gasto total',
       dataIndex: 'total_spend',
       key: 'total_spend',
       align: 'right',
@@ -200,21 +200,21 @@ export default function AnalyticsDashboard() {
       defaultSortOrder: 'descend',
     },
     {
-      title: 'Qty',
+      title: 'Cantidad',
       dataIndex: 'total_quantity',
       key: 'total_quantity',
       align: 'right',
       render: (v) => v.toLocaleString('es-ES'),
     },
     {
-      title: 'Avg Price',
+      title: 'Precio medio',
       dataIndex: 'avg_price',
       key: 'avg_price',
       align: 'right',
       render: (v) => `€${v.toFixed(2)}`,
     },
     {
-      title: '# Invoices',
+      title: 'Facturas',
       dataIndex: 'invoice_count',
       key: 'invoice_count',
       align: 'center',
@@ -238,12 +238,12 @@ export default function AnalyticsDashboard() {
         />
       </div>
 
-      <Card title="Material Price Analysis" style={{ marginBottom: 16 }}>
+      <Card title="Análisis de precios por material" style={{ marginBottom: 16 }}>
         <Space direction="vertical" style={{ width: '100%' }}>
           <Select
             showSearch
             style={{ width: 400, maxWidth: '100%' }}
-            placeholder="Search and select a material to analyze..."
+            placeholder="Selecciona un material..."
             filterOption={false}
             onSearch={(val) => setMaterialSearch(val)}
             onChange={(val) => setSelectedMaterialId(val as number)}
@@ -279,7 +279,7 @@ export default function AnalyticsDashboard() {
             </Row>
           ) : (
             <Typography.Text type="secondary">
-              Select a material above to view price history and provider comparison charts.
+              Selecciona un material para ver el histórico de precios y comparativa de proveedores.
             </Typography.Text>
           )}
         </Space>
@@ -287,7 +287,7 @@ export default function AnalyticsDashboard() {
 
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={14}>
-          <Card title="Top Materials by Spend">
+          <Card title="Materiales por gasto total">
             {loadingStats ? (
               <Spin />
             ) : (
@@ -296,13 +296,13 @@ export default function AnalyticsDashboard() {
           </Card>
         </Col>
         <Col xs={24} lg={10}>
-          <Card title="Spending by Family">
+          <Card title="Gasto por familia">
             <ReactECharts option={familyPieOption} style={{ height: 320 }} />
           </Card>
         </Col>
       </Row>
 
-      <Card title="Materials Statistics" style={{ marginTop: 16 }}>
+      <Card title="Estadísticas de materiales" style={{ marginTop: 16 }}>
         <Table
           columns={statsColumns}
           dataSource={materialsStats || []}

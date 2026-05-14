@@ -52,15 +52,15 @@ export default function Login() {
         <Space direction="vertical" size="large" style={{ width: '100%' }}>
           <div style={{ textAlign: 'center' }}>
             <Title level={2} style={{ marginBottom: 4 }}>
-              Invoice Processing
+              Autofact
             </Title>
-            <Text type="secondary">Sign in to your account</Text>
+            <Text type="secondary">Accede a tu cuenta</Text>
           </div>
 
           {loginMutation.isError && (
             <Alert
-              message="Login Failed"
-              description="Invalid username or password. Please try again."
+              message="Error de acceso"
+              description="Usuario o contraseña incorrectos. Inténtalo de nuevo."
               type="error"
               showIcon
               closable
@@ -76,24 +76,24 @@ export default function Login() {
           >
             <Form.Item
               name="username"
-              label="Username"
-              rules={[{ required: true, message: 'Please enter your username' }]}
+              label="Usuario"
+              rules={[{ required: true, message: 'Introduce tu usuario' }]}
             >
               <Input
                 prefix={<UserOutlined />}
-                placeholder="Enter username"
+                placeholder="Nombre de usuario"
                 autoFocus
               />
             </Form.Item>
 
             <Form.Item
               name="password"
-              label="Password"
-              rules={[{ required: true, message: 'Please enter your password' }]}
+              label="Contraseña"
+              rules={[{ required: true, message: 'Introduce tu contraseña' }]}
             >
               <Input.Password
                 prefix={<LockOutlined />}
-                placeholder="Enter password"
+                placeholder="Contraseña"
               />
             </Form.Item>
 
@@ -104,7 +104,7 @@ export default function Login() {
                 block
                 loading={loginMutation.isPending}
               >
-                Sign In
+                Entrar
               </Button>
             </Form.Item>
           </Form>

@@ -94,27 +94,27 @@ export default function DestinationList() {
 
   const columns: ColumnsType<Destination> = [
     {
-      title: 'Code',
+      title: 'Código',
       dataIndex: 'code',
       key: 'code',
       width: 120,
       render: (code) => <Tag color="blue">{code}</Tag>,
     },
     {
-      title: 'Name',
+      title: 'Nombre',
       dataIndex: 'name',
       key: 'name',
       ellipsis: true,
     },
     {
-      title: 'Description',
+      title: 'Descripción',
       dataIndex: 'description',
       key: 'description',
       ellipsis: true,
       render: (d) => d || '—',
     },
     {
-      title: 'Status',
+      title: 'Estado',
       dataIndex: 'is_active',
       key: 'is_active',
       width: 90,
@@ -130,7 +130,7 @@ export default function DestinationList() {
       render: (d) => dayjs(d).format('DD/MM/YYYY'),
     },
     {
-      title: 'Actions',
+      title: 'Acciones',
       key: 'actions',
       width: 100,
       render: (_, record) => (
@@ -200,7 +200,7 @@ export default function DestinationList() {
             setCreateModalOpen(true);
           }}
         >
-          New Destination
+          Nuevo destino
         </Button>
       </div>
 
@@ -247,7 +247,7 @@ export default function DestinationList() {
       </Card>
 
       <Modal
-        title="Create New Destination"
+        title="Create Nuevo destino"
         open={createModalOpen}
         onCancel={() => { setCreateModalOpen(false); form.resetFields(); }}
         onOk={handleCreate}

@@ -39,12 +39,12 @@ const statusColors: Record<DocumentStatus, string> = {
 };
 
 const statusOptions = [
-  { value: '', label: 'All Statuses' },
-  { value: 'uploaded', label: 'Uploaded' },
-  { value: 'processing', label: 'Processing' },
-  { value: 'segmented', label: 'Segmented' },
-  { value: 'ocr_done', label: 'OCR Done' },
-  { value: 'completed', label: 'Completed' },
+  { value: '', label: 'Todos los estados' },
+  { value: 'uploaded', label: 'Subido' },
+  { value: 'processing', label: 'Procesando' },
+  { value: 'segmented', label: 'Segmentado' },
+  { value: 'ocr_done', label: 'OCR listo' },
+  { value: 'completed', label: 'Completado' },
   { value: 'error', label: 'Error' },
 ];
 
@@ -59,9 +59,9 @@ export default function DocumentList() {
   const handleDelete = async (id: number) => {
     try {
       await deleteMutation.mutateAsync(id);
-      message.success('Document deleted successfully');
+      message.success('Documento eliminado');
     } catch {
-      message.error('Failed to delete document');
+      message.error('Error al eliminar el documento');
     }
   };
 
@@ -71,7 +71,7 @@ export default function DocumentList() {
 
   const columns: ColumnsType<DocumentListItem> = [
     {
-      title: 'Filename',
+      title: 'Archivo',
       dataIndex: 'original_filename',
       key: 'filename',
       ellipsis: true,
@@ -80,7 +80,7 @@ export default function DocumentList() {
       ),
     },
     {
-      title: 'Upload Date',
+      title: 'Fecha subida',
       dataIndex: 'upload_date',
       key: 'upload_date',
       render: (d) => dayjs(d).format('DD/MM/YYYY HH:mm'),
@@ -99,21 +99,21 @@ export default function DocumentList() {
       },
     },
     {
-      title: 'Pages',
+      title: 'Páginas',
       dataIndex: 'page_count',
       key: 'page_count',
       width: 80,
       align: 'center',
     },
     {
-      title: 'Detected',
+      title: 'Detectadas',
       dataIndex: 'detected_count',
       key: 'detected_count',
       width: 90,
       align: 'center',
     },
     {
-      title: 'Status',
+      title: 'Estado',
       dataIndex: 'status',
       key: 'status',
       width: 130,
@@ -124,7 +124,7 @@ export default function DocumentList() {
       ),
     },
     {
-      title: 'Actions',
+      title: 'Acciones',
       key: 'actions',
       width: 120,
       render: (_, record) => (
@@ -166,7 +166,7 @@ export default function DocumentList() {
           icon={<UploadOutlined />}
           onClick={() => navigate('/documents/upload')}
         >
-          Upload Documents
+          Subir documentos
         </Button>
       </div>
 
@@ -174,7 +174,7 @@ export default function DocumentList() {
         <Row gutter={[12, 12]} align="middle">
           <Col xs={24} sm={10} md={8}>
             <Input
-              placeholder="Search by filename..."
+              placeholder="Buscar por nombre..."
               prefix={<SearchOutlined />}
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}

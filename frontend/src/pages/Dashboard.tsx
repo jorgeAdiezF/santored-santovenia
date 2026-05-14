@@ -3,7 +3,7 @@ import { Card, Row, Col, Table, Tag, Typography, Statistic, Spin, Alert } from '
 import {
   FileTextOutlined,
   ClockCircleOutlined,
-  DollarOutlined,
+  EuroOutlined,
   QuestionCircleOutlined,
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
@@ -23,6 +23,15 @@ const statusColors: Record<string, string> = {
   error: 'error',
 };
 
+const statusLabels: Record<string, string> = {
+  uploaded: 'Subido',
+  processing: 'Procesando',
+  segmented: 'Segmentado',
+  ocr_done: 'OCR listo',
+  completed: 'Completado',
+  error: 'Error',
+};
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const { data: dashboard, isLoading, error } = useDashboard();
@@ -38,8 +47,8 @@ export default function Dashboard() {
   if (error) {
     return (
       <Alert
-        message="Failed to load dashboard"
-        description="Could not fetch dashboard data. Please try again."
+        message="Error al cargar el panel"
+        description="No se pudieron obtener los datos. Comprueba que el servidor está en marcha."
         type="error"
         showIcon
       />
@@ -112,7 +121,7 @@ export default function Dashboard() {
 
   const docColumns: ColumnsType<DocumentListItem> = [
     {
-      title: 'Filename',
+      title: 'Archivo',
       dataIndex: 'original_filename',
       key: 'filename',
       ellipsis: true,
@@ -121,26 +130,28 @@ export default function Dashboard() {
       ),
     },
     {
-      title: 'Upload Date',
+      title: 'Fecha de subida',
       dataIndex: 'upload_date',
       key: 'upload_date',
       render: (d) => dayjs(d).format('DD/MM/YYYY HH:mm'),
       width: 160,
     },
     {
-      title: 'Pages',
+      title: 'Páginas',
       dataIndex: 'page_count',
       key: 'page_count',
       width: 80,
       align: 'center',
     },
     {
-      title: 'Status',
+      title: 'Estado',
       dataIndex: 'status',
       key: 'status',
-      width: 120,
+      width: 130,
       render: (status) => (
-        <Tag color={statusColors[status] || 'default'}>{status.replace('_', ' ').toUpperCase()}</Tag>
+        <Tag color={statusColors[status] || 'default'}>
+          {statusLabels[status] || status.replace('_', ' ').toUpperCase()}
+        </Tag>
       ),
     },
   ];
@@ -148,14 +159,14 @@ export default function Dashboard() {
   return (
     <div>
       <Title level={3} style={{ marginBottom: 24 }}>
-        Dashboard
+        Panel de control
       </Title>
 
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={24} sm={12} lg={6}>
           <Card>
             <Statistic
-              title="Total Invoices"
+              title="Total facturas"
               value={dashboard?.total_invoices || 0}
               prefix={<FileTextOutlined />}
               valueStyle={{ color: '#1677ff' }}
@@ -165,7 +176,7 @@ export default function Dashboard() {
         <Col xs={24} sm={12} lg={6}>
           <Card>
             <Statistic
-              title="Pending Review"
+              title="Pendientes de revisión"
               value={dashboard?.pending_review || 0}
               prefix={<ClockCircleOutlined />}
               valueStyle={{ color: '#fa8c16' }}
@@ -175,10 +186,10 @@ export default function Dashboard() {
         <Col xs={24} sm={12} lg={6}>
           <Card>
             <Statistic
-              title="Total Spent This Month"
+              title="Gasto este mes"
               value={dashboard?.total_spent_this_month || 0}
               precision={2}
-              prefix={<DollarOutlined />}
+              prefix={<EuroOutlined />}
               suffix="€"
               valueStyle={{ color: '#52c41a' }}
             />
@@ -187,7 +198,7 @@ export default function Dashboard() {
         <Col xs={24} sm={12} lg={6}>
           <Card>
             <Statistic
-              title="Pending Homologation"
+              title="Sin homologar"
               value={dashboard?.pending_homologation || 0}
               prefix={<QuestionCircleOutlined />}
               valueStyle={{ color: '#f5222d' }}
@@ -198,24 +209,25 @@ export default function Dashboard() {
 
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={24} lg={14}>
-          <Card title="Monthly Spending (Last 6 Months)">
+          <Card title="Gasto mensual (últimos 6 meses)">
             <ReactECharts option={monthlyChartOption} style={{ height: 280 }} />
           </Card>
         </Col>
         <Col xs={24} lg={10}>
-          <Card title="Spending by Provider">
+          <Card title="Gasto por proveedor">
             <ReactECharts option={providerPieOption} style={{ height: 280 }} />
           </Card>
         </Col>
       </Row>
 
-      <Card title="Recent Documents">
+      <Card title="Documentos recientes">
         <Table
           columns={docColumns}
           dataSource={dashboard?.recent_documents || []}
           rowKey="id"
           pagination={false}
           size="small"
+          locale={{ emptyText: 'Sin documentos' }}
         />
       </Card>
     </div>

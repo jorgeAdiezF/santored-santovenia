@@ -42,33 +42,33 @@ function getItem(
 }
 
 const menuItems: MenuItem[] = [
-  getItem('Dashboard', '/', <DashboardOutlined />),
-  getItem('Documents', '/documents', <FileTextOutlined />, [
-    getItem('All Documents', '/documents', <FileTextOutlined />),
-    getItem('Upload', '/documents/upload', <UploadOutlined />),
+  getItem('Inicio', '/', <DashboardOutlined />),
+  getItem('Documentos', '/documents', <FileTextOutlined />, [
+    getItem('Todos los documentos', '/documents', <FileTextOutlined />),
+    getItem('Subir PDF', '/documents/upload', <UploadOutlined />),
   ]),
-  getItem('Review Queue', '/review', <CheckCircleOutlined />),
-  getItem('Materials', '/materials', <AppstoreOutlined />),
-  getItem('Providers', '/providers', <ShopOutlined />),
-  getItem('Destinations', '/destinations', <EnvironmentOutlined />),
-  getItem('Analytics', '/analytics', <BarChartOutlined />),
+  getItem('Cola de revisión', '/review', <CheckCircleOutlined />),
+  getItem('Materiales', '/materials', <AppstoreOutlined />),
+  getItem('Proveedores', '/providers', <ShopOutlined />),
+  getItem('Destinos', '/destinations', <EnvironmentOutlined />),
+  getItem('Analíticas', '/analytics', <BarChartOutlined />),
 ];
 
 const adminMenuItems: MenuItem[] = [
   ...menuItems,
-  getItem('Users', '/users', <UserOutlined />),
+  getItem('Usuarios', '/users', <UserOutlined />),
 ];
 
 const breadcrumbMap: Record<string, string> = {
-  '/': 'Dashboard',
-  '/documents': 'Documents',
-  '/documents/upload': 'Upload',
-  '/review': 'Review Queue',
-  '/materials': 'Materials',
-  '/providers': 'Providers',
-  '/destinations': 'Destinations',
-  '/analytics': 'Analytics',
-  '/users': 'Users',
+  '/': 'Inicio',
+  '/documents': 'Documentos',
+  '/documents/upload': 'Subir PDF',
+  '/review': 'Cola de revisión',
+  '/materials': 'Materiales',
+  '/providers': 'Proveedores',
+  '/destinations': 'Destinos',
+  '/analytics': 'Analíticas',
+  '/users': 'Usuarios',
 };
 
 export default function AppLayout() {
@@ -90,21 +90,21 @@ export default function AppLayout() {
     {
       key: 'profile',
       icon: <UserOutlined />,
-      label: user?.full_name || user?.username || 'Profile',
+      label: user?.full_name || user?.username || 'Perfil',
       disabled: true,
     },
     { type: 'divider' },
     {
       key: 'logout',
       icon: <LogoutOutlined />,
-      label: 'Logout',
+      label: 'Cerrar sesión',
       onClick: handleLogout,
     },
   ];
 
   const pathParts = location.pathname.split('/').filter(Boolean);
   const breadcrumbItems = [
-    { title: 'Home', onClick: () => navigate('/') },
+    { title: 'Inicio', onClick: () => navigate('/') },
     ...pathParts.map((part, index) => {
       const path = '/' + pathParts.slice(0, index + 1).join('/');
       const label = breadcrumbMap[path] || part;
@@ -147,12 +147,12 @@ export default function AppLayout() {
               strong
               style={{ color: 'white', fontSize: 16, whiteSpace: 'nowrap', overflow: 'hidden' }}
             >
-              Invoice System
+              Autofact
             </Text>
           )}
           {collapsed && (
             <Text strong style={{ color: 'white', fontSize: 16 }}>
-              IS
+              AF
             </Text>
           )}
         </div>

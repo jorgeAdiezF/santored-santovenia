@@ -69,7 +69,7 @@ export default function ProviderList() {
 
   const columns: ColumnsType<Provider> = [
     {
-      title: 'Code',
+      title: 'Código',
       dataIndex: 'code',
       key: 'code',
       width: 100,
@@ -78,13 +78,13 @@ export default function ProviderList() {
       ),
     },
     {
-      title: 'Name',
+      title: 'Nombre',
       dataIndex: 'name',
       key: 'name',
       ellipsis: true,
     },
     {
-      title: 'Tax ID',
+      title: 'NIF/CIF',
       dataIndex: 'tax_id',
       key: 'tax_id',
       width: 140,
@@ -97,21 +97,21 @@ export default function ProviderList() {
       render: (e) => e || '—',
     },
     {
-      title: 'Phone',
+      title: 'Teléfono',
       dataIndex: 'phone',
       key: 'phone',
       width: 140,
       render: (p) => p || '—',
     },
     {
-      title: 'Aliases',
+      title: 'Alias',
       key: 'aliases',
       width: 80,
       align: 'center',
       render: (_, r) => <Tag color="blue">{r.aliases?.length || 0}</Tag>,
     },
     {
-      title: 'Status',
+      title: 'Estado',
       dataIndex: 'is_active',
       key: 'is_active',
       width: 90,
@@ -120,14 +120,14 @@ export default function ProviderList() {
       ),
     },
     {
-      title: 'Created',
+      title: 'Alta',
       dataIndex: 'created_at',
       key: 'created_at',
       width: 120,
       render: (d) => dayjs(d).format('DD/MM/YYYY'),
     },
     {
-      title: 'Actions',
+      title: 'Acciones',
       key: 'actions',
       width: 100,
       render: (_, record) => (
@@ -198,7 +198,7 @@ export default function ProviderList() {
             setCreateModalOpen(true);
           }}
         >
-          New Provider
+          Nuevo proveedor
         </Button>
       </div>
 
@@ -206,7 +206,7 @@ export default function ProviderList() {
         <Row gutter={[12, 12]} align="middle">
           <Col xs={24} sm={16} md={10}>
             <Input
-              placeholder="Search providers..."
+              placeholder="Buscar proveedores..."
               prefix={<SearchOutlined />}
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
@@ -241,7 +241,7 @@ export default function ProviderList() {
       </Card>
 
       <Modal
-        title="Create New Provider"
+        title="Create Nuevo proveedor"
         open={createModalOpen}
         onCancel={() => {
           setCreateModalOpen(false);

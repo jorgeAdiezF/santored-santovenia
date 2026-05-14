@@ -33,7 +33,7 @@ export default function MaterialList() {
   const createMaterialMutation = useCreateMaterial();
 
   const familyOptions = [
-    { value: '', label: 'All Families' },
+    { value: '', label: 'Todas las familias' },
     ...(families || []).map((f) => ({ value: f.id, label: f.name })),
   ];
 
@@ -55,7 +55,7 @@ export default function MaterialList() {
 
   const columns: ColumnsType<MaterialMaster> = [
     {
-      title: 'Code',
+      title: 'Código',
       dataIndex: 'master_code',
       key: 'master_code',
       width: 130,
@@ -64,34 +64,34 @@ export default function MaterialList() {
       ),
     },
     {
-      title: 'Description',
+      title: 'Descripción',
       dataIndex: 'normalized_description',
       key: 'description',
       ellipsis: true,
     },
     {
-      title: 'Family',
+      title: 'Familia',
       key: 'family',
       width: 150,
       render: (_, r) =>
         r.family ? <Tag color="blue">{r.family.name}</Tag> : <Tag>Uncategorized</Tag>,
     },
     {
-      title: 'Dimensions',
+      title: 'Dimensiones',
       dataIndex: 'dimensions',
       key: 'dimensions',
       width: 120,
       render: (d) => d || '—',
     },
     {
-      title: 'Base Unit',
+      title: 'Unidad base',
       dataIndex: 'base_unit',
       key: 'base_unit',
       width: 100,
       align: 'center',
     },
     {
-      title: 'Aliases',
+      title: 'Alias',
       dataIndex: 'aliases_count',
       key: 'aliases_count',
       width: 80,
@@ -101,7 +101,7 @@ export default function MaterialList() {
       ),
     },
     {
-      title: 'Status',
+      title: 'Estado',
       dataIndex: 'is_active',
       key: 'is_active',
       width: 90,
@@ -110,7 +110,7 @@ export default function MaterialList() {
       ),
     },
     {
-      title: 'Actions',
+      title: 'Acciones',
       key: 'actions',
       width: 80,
       render: (_, record) => (
@@ -128,14 +128,14 @@ export default function MaterialList() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <Title level={3} style={{ margin: 0 }}>
-          Materials Catalog
+          Catálogo de materiales
         </Title>
         <Button
           type="primary"
           icon={<PlusOutlined />}
           onClick={() => setCreateModalOpen(true)}
         >
-          New Material
+          Nuevo material
         </Button>
       </div>
 
@@ -143,7 +143,7 @@ export default function MaterialList() {
         <Row gutter={[12, 12]} align="middle">
           <Col xs={24} sm={12} md={8}>
             <Input
-              placeholder="Search materials..."
+              placeholder="Buscar materiales..."
               prefix={<SearchOutlined />}
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
@@ -193,7 +193,7 @@ export default function MaterialList() {
       </Card>
 
       <Modal
-        title="Create New Material"
+        title="Create Nuevo material"
         open={createModalOpen}
         onCancel={() => {
           setCreateModalOpen(false);
