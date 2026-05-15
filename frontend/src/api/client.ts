@@ -1,7 +1,7 @@
 import axios, { AxiosError } from 'axios';
 import { useAuthStore } from '../store/auth';
 
-const BASE_URL = import.meta.env.VITE_API_URL || '/api';
+const BASE_URL = import.meta.env.VITE_API_URL || '';
 
 const apiClient = axios.create({
   baseURL: BASE_URL,
@@ -65,7 +65,7 @@ apiClient.interceptors.response.use(
     original!._retry = true;
 
     try {
-      const { data } = await axios.post(`${BASE_URL}/auth/refresh`, {
+      const { data } = await axios.post(`/api/auth/refresh`, {
         refresh_token: refreshToken,
       });
       const newToken: string = data.access_token;

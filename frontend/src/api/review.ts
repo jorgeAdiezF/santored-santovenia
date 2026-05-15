@@ -9,15 +9,13 @@ import type {
   ListParams,
 } from '../types';
 
-export const getPendingInvoices = async (params?: ListParams): Promise<PaginatedResponse<Invoice>> => {
-  const response = await apiClient.get<PaginatedResponse<Invoice>>('/api/invoices', {
-    params: { ...params, status: params?.status || 'pending_review' },
-  });
+export const getPendingInvoices = async (params?: ListParams): Promise<Invoice[]> => {
+  const response = await apiClient.get<Invoice[]>('/api/reviews/invoices/pending', { params });
   return response.data;
 };
 
 export const getInvoice = async (id: number): Promise<Invoice> => {
-  const response = await apiClient.get<Invoice>(`/api/invoices/${id}`);
+  const response = await apiClient.get<Invoice>(`/api/reviews/invoices/${id}`);
   return response.data;
 };
 
@@ -25,7 +23,7 @@ export const updateInvoiceHeader = async (
   id: number,
   data: UpdateInvoiceHeaderRequest
 ): Promise<Invoice> => {
-  const response = await apiClient.put<Invoice>(`/api/invoices/${id}`, data);
+  const response = await apiClient.put<Invoice>(`/api/reviews/invoices/${id}`, data);
   return response.data;
 };
 
@@ -35,39 +33,36 @@ export const updateInvoiceLine = async (
   data: UpdateInvoiceLineRequest
 ): Promise<InvoiceLine> => {
   const response = await apiClient.put<InvoiceLine>(
-    `/api/invoices/${invoiceId}/lines/${lineId}`,
+    `/api/reviews/invoices/${invoiceId}/lines/${lineId}`,
     data
   );
   return response.data;
 };
 
 export const finalizeInvoice = async (id: number): Promise<Invoice> => {
-  const response = await apiClient.post<Invoice>(`/api/invoices/${id}/approve`);
+  const response = await apiClient.post<Invoice>(`/api/reviews/invoices/${id}/finalize`);
   return response.data;
 };
 
 export const rejectInvoice = async (id: number, reason: string): Promise<Invoice> => {
-  const response = await apiClient.post<Invoice>(`/api/invoices/${id}/reject`, { reason });
+  const response = await apiClient.post<Invoice>(`/api/reviews/invoices/${id}/reject`, { reason });
   return response.data;
 };
 
-export const getPendingHomologation = async (
-  params?: ListParams
-): Promise<PaginatedResponse<InvoiceLine>> => {
-  const response = await apiClient.get<PaginatedResponse<InvoiceLine>>(
-    '/api/invoices/lines/pending-homologation',
-    { params }
-  );
+export const getPendingHomologation = async (params?: ListParams): Promise<InvoiceLine[]> => {
+  const response = await apiClient.get<InvoiceLine[]>('/api/reviews/homologation/pending', {
+    params,
+  });
   return response.data;
 };
 
 export const homologateLine = async (
-  invoiceId: number,
+  _invoiceId: number,
   lineId: number,
   data: HomologateLineRequest
 ): Promise<InvoiceLine> => {
-  const response = await apiClient.post<InvoiceLine>(
-    `/api/invoices/${invoiceId}/lines/${lineId}/homologate`,
+  const response = await apiClient.put<InvoiceLine>(
+    `/api/reviews/lines/${lineId}/homologate`,
     data
   );
   return response.data;

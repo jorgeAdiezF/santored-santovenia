@@ -2,13 +2,7 @@ import apiClient from './client';
 import type { LoginRequest, LoginResponse, RefreshTokenResponse, User } from '../types';
 
 export const login = async (credentials: LoginRequest): Promise<LoginResponse> => {
-  const formData = new FormData();
-  formData.append('username', credentials.username);
-  formData.append('password', credentials.password);
-
-  const response = await apiClient.post<LoginResponse>('/api/auth/login', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
+  const response = await apiClient.post<LoginResponse>('/api/auth/login', credentials);
   return response.data;
 };
 
@@ -17,8 +11,10 @@ export const getMe = async (): Promise<User> => {
   return response.data;
 };
 
-export const refreshToken = async (): Promise<RefreshTokenResponse> => {
-  const response = await apiClient.post<RefreshTokenResponse>('/api/auth/refresh');
+export const refreshToken = async (token: string): Promise<RefreshTokenResponse> => {
+  const response = await apiClient.post<RefreshTokenResponse>('/api/auth/refresh', {
+    refresh_token: token,
+  });
   return response.data;
 };
 

@@ -34,12 +34,12 @@ export const deleteDestination = async (id: number): Promise<void> => {
 };
 
 export const assignDestination = async (
-  invoiceId: number,
+  _invoiceId: number,
   data: AssignDestinationRequest
 ): Promise<InvoiceLineDestination> => {
   const response = await apiClient.post<InvoiceLineDestination>(
-    `/api/invoices/${invoiceId}/lines/${data.line_id}/destinations`,
-    { destination_id: data.destination_id, quantity: data.quantity }
+    `/api/invoice-lines/${data.line_id}/destinations`,
+    { destination_id: data.destination_id, notes: data.notes }
   );
   return response.data;
 };
