@@ -200,16 +200,6 @@ async def proxy(full_path: str, request: Request):
     """Generic proxy for all other routes."""
     path = f"/{full_path}"
 
-    if path not in PUBLIC_PATHS:
-        if not path.startswith("/auth/"):
-            payload = verify_token(request)
-            if not payload:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Not authenticated",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
-
     service_url = get_service_url(path)
     if not service_url:
         raise HTTPException(

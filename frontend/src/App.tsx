@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ConfigProvider } from 'antd';
 import AppLayout from './components/Layout/AppLayout';
 import ProtectedRoute from './components/Layout/ProtectedRoute';
-import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import DocumentList from './pages/Documents/DocumentList';
 import DocumentUpload from './pages/Documents/DocumentUpload';
@@ -15,11 +14,8 @@ import ProviderList from './pages/Providers/ProviderList';
 import AnalyticsDashboard from './pages/Analytics/AnalyticsDashboard';
 import DestinationList from './pages/Destinations/DestinationList';
 import UserList from './pages/Users/UserList';
-import { useAuth } from './hooks/useAuth';
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { isAdmin } = useAuth();
-  if (!isAdmin) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
@@ -34,7 +30,7 @@ export default function App() {
     >
       <BrowserRouter>
         <Routes>
-          <Route path="/login" element={<Login />} />
+          <Route path="/login" element={<Navigate to="/" replace />} />
           <Route
             path="/"
             element={
