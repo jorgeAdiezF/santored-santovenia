@@ -55,7 +55,7 @@ def trigger_segmentation(document_id: int) -> None:
         print(f"Warning: Failed to trigger segmentation for document {document_id}: {e}")
 
 
-@app.post("/documents/upload", response_model=List[DocumentResponse], status_code=status.HTTP_201_CREATED)
+@app.post("/documents/upload", status_code=status.HTTP_201_CREATED)
 async def upload_document(
     files: List[UploadFile] = File(...),
     db: AsyncSession = Depends(get_db),
@@ -108,7 +108,28 @@ async def upload_document(
 
         await db.flush()
         trigger_segmentation(document.id)
-        results.append(document)
+
+        upload_date = document.upload_date.isoformat() if document.upload_date else None
+        results.append({
+            "id": document.id,
+            "filename": document.filename,
+            "original_filename": document.filename,
+            "file_type": document.file_type,
+            "file_size": document.file_size,
+            "storage_path": document.storage_path,
+            "file_path": document.storage_path,
+            "upload_user_id": document.upload_user_id,
+            "uploaded_by": document.upload_user_id,
+            "upload_date": upload_date,
+            "created_at": upload_date,
+            "updated_at": upload_date,
+            "status": "processing" if document.status == "pages_extracted" else document.status,
+            "page_count": document.page_count,
+            "pages": [],
+            "detected_docs": [],
+            "processed_at": None,
+            "error_message": None,
+        })
 
     return results
 
@@ -173,17 +194,43 @@ async def list_documents(
     return {"items": items, "total": total, "page": page, "size": size, "pages": total_pages}
 
 
-@app.get("/documents/{document_id}", response_model=DocumentResponse)
+@app.get("/documents/{document_id}")
 async def get_document(
     document_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(Document).where(Document.id == document_id))
+    result = await db.execute(
+        select(Document)
+        .options(selectinload(Document.pages), selectinload(Document.detected_docs))
+        .where(Document.id == document_id)
+    )
     document = result.scalar_one_or_none()
     if not document:
         raise NotFoundError("Document", document_id)
-    return document
+
+    upload_date = document.upload_date.isoformat() if document.upload_date else None
+    status = "processing" if document.status == "pages_extracted" else document.status
+    return {
+        "id": document.id,
+        "filename": document.filename,
+        "original_filename": document.filename,
+        "file_type": document.file_type,
+        "file_size": document.file_size,
+        "storage_path": document.storage_path,
+        "file_path": document.storage_path,
+        "upload_user_id": document.upload_user_id,
+        "uploaded_by": document.upload_user_id,
+        "upload_date": upload_date,
+        "created_at": upload_date,
+        "updated_at": upload_date,
+        "status": status,
+        "page_count": document.page_count,
+        "pages": [{"id": p.id, "document_id": p.document_id, "page_number": p.page_number, "image_path": p.image_path} for p in document.pages],
+        "detected_docs": [{"id": d.id, "document_id": d.document_id, "start_page": d.start_page, "end_page": d.end_page, "page_start": d.start_page, "page_end": d.end_page, "status": d.status, "confidence": d.confidence, "doc_type": "invoice", "created_at": None, "updated_at": None} for d in document.detected_docs],
+        "processed_at": None,
+        "error_message": None,
+    }
 
 
 @app.get("/documents/{document_id}/pages/{page_number}")

@@ -201,8 +201,6 @@ class DocumentResponse(BaseModel):
     upload_date: Optional[datetime] = None
     status: str
     page_count: Optional[int] = None
-    pages: List[PageResponse] = []
-    detected_docs: List[DetectedDocResponse] = []
     processed_at: Optional[datetime] = None
     error_message: Optional[str] = None
 
