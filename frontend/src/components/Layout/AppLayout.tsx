@@ -83,7 +83,7 @@ export default function AppLayout() {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/');
   };
 
   const userMenuItems: MenuProps['items'] = [

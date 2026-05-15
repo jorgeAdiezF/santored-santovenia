@@ -1,6 +1,16 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import type { User } from '../types';
+
+const DEV_USER: User = {
+  id: 1,
+  username: 'admin',
+  full_name: 'Administrador',
+  email: 'admin@autofact.local',
+  role: 'admin',
+  is_active: true,
+  created_at: '',
+  updated_at: '',
+};
 
 interface AuthState {
   user: User | null;
@@ -13,34 +23,21 @@ interface AuthState {
   setToken: (token: string) => void;
 }
 
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set) => ({
-      user: null,
-      token: null,
-      refreshToken: null,
-      isAuthenticated: false,
-      login: (token: string, user: User, refreshToken?: string) => {
-        set({ token, user, isAuthenticated: true, refreshToken: refreshToken ?? null });
-      },
-      logout: () => {
-        set({ token: null, user: null, isAuthenticated: false, refreshToken: null });
-      },
-      setUser: (user: User) => {
-        set({ user });
-      },
-      setToken: (token: string) => {
-        set({ token });
-      },
-    }),
-    {
-      name: 'auth-storage',
-      partialize: (state) => ({
-        token: state.token,
-        refreshToken: state.refreshToken,
-        user: state.user,
-        isAuthenticated: state.isAuthenticated,
-      }),
-    }
-  )
-);
+export const useAuthStore = create<AuthState>()((set) => ({
+  user: DEV_USER,
+  token: 'dev-token',
+  refreshToken: 'dev-refresh-token',
+  isAuthenticated: true,
+  login: (token: string, user: User, refreshToken?: string) => {
+    set({ token, user, isAuthenticated: true, refreshToken: refreshToken ?? null });
+  },
+  logout: () => {
+    set({ user: DEV_USER, token: 'dev-token', refreshToken: 'dev-refresh-token', isAuthenticated: true });
+  },
+  setUser: (user: User) => {
+    set({ user });
+  },
+  setToken: (token: string) => {
+    set({ token });
+  },
+}));
