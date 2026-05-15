@@ -5,7 +5,6 @@ import type {
   UpdateInvoiceHeaderRequest,
   UpdateInvoiceLineRequest,
   HomologateLineRequest,
-  PaginatedResponse,
   ListParams,
 } from '../types';
 

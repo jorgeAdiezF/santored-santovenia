@@ -184,13 +184,13 @@ export default function InvoiceReviewList() {
       <Card>
         <Table
           columns={columns}
-          dataSource={data?.items || []}
+          dataSource={Array.isArray(data) ? data : []}
           rowKey="id"
           loading={isLoading}
           pagination={{
             current: params.page,
             pageSize: params.size,
-            total: data?.total || 0,
+            total: Array.isArray(data) ? data.length : 0,
             showSizeChanger: true,
             showTotal: (total) => `Total ${total} invoices`,
             onChange: (page, pageSize) =>

@@ -39,7 +39,7 @@ export const assignDestination = async (
 ): Promise<InvoiceLineDestination> => {
   const response = await apiClient.post<InvoiceLineDestination>(
     `/api/invoice-lines/${data.line_id}/destinations`,
-    { destination_id: data.destination_id, notes: data.notes }
+    { destination_id: data.destination_id, quantity: data.quantity }
   );
   return response.data;
 };
