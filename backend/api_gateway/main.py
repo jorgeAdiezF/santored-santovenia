@@ -214,6 +214,8 @@ async def proxy(full_path: str, request: Request):
     headers = dict(request.headers)
     headers.pop("host", None)
     headers.pop("content-length", None)
+    headers.pop("transfer-encoding", None)
+    headers.pop("connection", None)
 
     try:
         body = await request.body()
