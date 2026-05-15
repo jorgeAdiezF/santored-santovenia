@@ -55,68 +55,62 @@ def trigger_segmentation(document_id: int) -> None:
         print(f"Warning: Failed to trigger segmentation for document {document_id}: {e}")
 
 
-@app.post("/documents/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
+@app.post("/documents/upload", response_model=List[DocumentResponse], status_code=status.HTTP_201_CREATED)
 async def upload_document(
-    file: UploadFile = File(...),
+    files: List[UploadFile] = File(...),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    content = await file.read()
+    results = []
+    for file in files:
+        content = await file.read()
 
-    file_hash = hashlib.sha256(content).hexdigest()
+        file_hash = hashlib.sha256(content).hexdigest()
 
-    existing = await db.execute(select(Document).where(Document.file_hash == file_hash))
-    if existing.scalar_one_or_none():
-        raise ConflictError(f"Document with hash {file_hash} already exists")
+        existing = await db.execute(select(Document).where(Document.file_hash == file_hash))
+        if existing.scalar_one_or_none():
+            continue
 
-    file_type = file.content_type or "application/octet-stream"
-    file_size = len(content)
-    filename = file.filename or "unknown"
+        file_type = file.content_type or "application/octet-stream"
+        file_size = len(content)
+        filename = file.filename or "unknown"
 
-    object_name = f"documents/originals/{file_hash}/{filename}"
-    upload_bytes(
-        object_name=object_name,
-        data=content,
-        content_type=file_type,
-    )
+        object_name = f"documents/originals/{file_hash}/{filename}"
+        upload_bytes(object_name=object_name, data=content, content_type=file_type)
 
-    page_count = 0
-    if file_type == "application/pdf" or filename.lower().endswith(".pdf"):
-        page_count = get_page_count_from_pdf(content)
+        page_count = 0
+        if file_type == "application/pdf" or filename.lower().endswith(".pdf"):
+            page_count = get_page_count_from_pdf(content)
 
-    document = Document(
-        file_hash=file_hash,
-        filename=filename,
-        file_type=file_type,
-        file_size=file_size,
-        storage_path=object_name,
-        upload_user_id=current_user.id,
-        status="uploaded",
-        page_count=page_count if page_count > 0 else None,
-    )
-    db.add(document)
-    await db.flush()
+        document = Document(
+            file_hash=file_hash,
+            filename=filename,
+            file_type=file_type,
+            file_size=file_size,
+            storage_path=object_name,
+            upload_user_id=current_user.id,
+            status="uploaded",
+            page_count=page_count if page_count > 0 else None,
+        )
+        db.add(document)
+        await db.flush()
 
-    if file_type == "application/pdf" or filename.lower().endswith(".pdf"):
-        try:
-            page_paths = process_document_pages(document.id, content)
-            for page_number, image_path in page_paths:
-                page = Page(
-                    document_id=document.id,
-                    page_number=page_number,
-                    image_path=image_path,
-                )
-                db.add(page)
-            document.page_count = len(page_paths)
-            document.status = "pages_extracted"
-        except Exception as e:
-            print(f"Warning: Failed to extract pages: {str(e)}")
+        if file_type == "application/pdf" or filename.lower().endswith(".pdf"):
+            try:
+                page_paths = process_document_pages(document.id, content)
+                for page_number, image_path in page_paths:
+                    page = Page(document_id=document.id, page_number=page_number, image_path=image_path)
+                    db.add(page)
+                document.page_count = len(page_paths)
+                document.status = "pages_extracted"
+            except Exception as e:
+                print(f"Warning: Failed to extract pages: {str(e)}")
 
-    await db.flush()
+        await db.flush()
+        trigger_segmentation(document.id)
+        results.append(document)
 
-    trigger_segmentation(document.id)
-
-    return document
+    return results
 
 
 @app.get("/documents", response_model=List[DocumentResponse])
