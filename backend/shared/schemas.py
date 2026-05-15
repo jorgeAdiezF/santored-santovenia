@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, computed_field, field_validator
 from typing import Optional, List, Any
 from datetime import datetime, date
 from decimal import Decimal
@@ -108,22 +108,29 @@ class ProviderResponse(BaseModel):
     active: bool
     aliases: List[ProviderAliasResponse] = []
 
+    # Frontend compatibility aliases
+    @computed_field
+    @property
+    def name(self) -> str:
+        return self.fiscal_name
+
+    @computed_field
+    @property
+    def code(self) -> str:
+        return self.tax_id or ""
+
+    @computed_field
+    @property
+    def is_active(self) -> bool:
+        return self.active
+
+    @computed_field
+    @property
+    def updated_at(self) -> Optional[datetime]:
+        return self.created_at
+
 
 # --- Document ---
-class DocumentResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: int
-    file_hash: str
-    filename: str
-    file_type: Optional[str] = None
-    file_size: Optional[int] = None
-    storage_path: str
-    upload_user_id: Optional[int] = None
-    upload_date: Optional[datetime] = None
-    status: str
-    page_count: Optional[int] = None
-
-
 class PageResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
@@ -132,7 +139,6 @@ class PageResponse(BaseModel):
     image_path: str
 
 
-# --- Detected Docs (Segments) ---
 class DetectedDocResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
@@ -141,6 +147,32 @@ class DetectedDocResponse(BaseModel):
     end_page: int
     status: str
     confidence: float
+
+    # Frontend compatibility aliases
+    @computed_field
+    @property
+    def page_start(self) -> int:
+        return self.start_page
+
+    @computed_field
+    @property
+    def page_end(self) -> int:
+        return self.end_page
+
+    @computed_field
+    @property
+    def doc_type(self) -> str:
+        return "invoice"
+
+    @computed_field
+    @property
+    def created_at(self) -> Optional[str]:
+        return None
+
+    @computed_field
+    @property
+    def updated_at(self) -> Optional[str]:
+        return None
 
 
 class DetectedDocUpdate(BaseModel):
@@ -158,6 +190,95 @@ class SegmentSplitRequest(BaseModel):
     split_at_page: int
 
 
+class DocumentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    filename: str
+    file_type: Optional[str] = None
+    file_size: Optional[int] = None
+    storage_path: str = ""
+    upload_user_id: Optional[int] = None
+    upload_date: Optional[datetime] = None
+    status: str
+    page_count: Optional[int] = None
+    pages: List[PageResponse] = []
+    detected_docs: List[DetectedDocResponse] = []
+    processed_at: Optional[datetime] = None
+    error_message: Optional[str] = None
+
+    @field_validator('status', mode='before')
+    @classmethod
+    def normalize_doc_status(cls, v: Any) -> str:
+        if v == 'pages_extracted':
+            return 'processing'
+        return str(v) if v is not None else 'uploaded'
+
+    # Frontend compatibility aliases
+    @computed_field
+    @property
+    def original_filename(self) -> str:
+        return self.filename
+
+    @computed_field
+    @property
+    def file_path(self) -> str:
+        return self.storage_path
+
+    @computed_field
+    @property
+    def uploaded_by(self) -> Optional[int]:
+        return self.upload_user_id
+
+    @computed_field
+    @property
+    def created_at(self) -> Optional[datetime]:
+        return self.upload_date
+
+    @computed_field
+    @property
+    def updated_at(self) -> Optional[datetime]:
+        return self.upload_date
+
+
+class DocumentListItemResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    filename: str
+    file_size: Optional[int] = None
+    page_count: Optional[int] = None
+    status: str
+    upload_date: Optional[datetime] = None
+    upload_user_id: Optional[int] = None
+    detected_docs: List[DetectedDocResponse] = []
+
+    @field_validator('status', mode='before')
+    @classmethod
+    def normalize_doc_status(cls, v: Any) -> str:
+        if v == 'pages_extracted':
+            return 'processing'
+        return str(v) if v is not None else 'uploaded'
+
+    @computed_field
+    @property
+    def original_filename(self) -> str:
+        return self.filename
+
+    @computed_field
+    @property
+    def uploaded_by(self) -> Optional[int]:
+        return self.upload_user_id
+
+    @computed_field
+    @property
+    def created_at(self) -> Optional[datetime]:
+        return self.upload_date
+
+    @computed_field
+    @property
+    def detected_count(self) -> int:
+        return len(self.detected_docs)
+
+
 # --- Invoice ---
 class InvoiceUpdate(BaseModel):
     provider_id: Optional[int] = None
@@ -171,34 +292,22 @@ class InvoiceUpdate(BaseModel):
     status: Optional[str] = None
 
 
-class InvoiceResponse(BaseModel):
+class InvoiceLineDestinationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
-    detected_doc_id: Optional[int] = None
-    provider_id: Optional[int] = None
-    tax_id: Optional[str] = None
-    invoice_number: Optional[str] = None
-    invoice_date: Optional[date] = None
-    subtotal: Optional[Decimal] = None
-    vat: Optional[Decimal] = None
-    total: Optional[Decimal] = None
-    currency: str
-    status: str
-    validated_at: Optional[datetime] = None
-    validated_by: Optional[int] = None
+    invoice_line_id: int
+    destination_id: int
+    notes: Optional[str] = None
 
+    @computed_field
+    @property
+    def line_id(self) -> int:
+        return self.invoice_line_id
 
-# --- Invoice Line ---
-class InvoiceLineUpdate(BaseModel):
-    supplier_code: Optional[str] = None
-    original_description: Optional[str] = None
-    quantity: Optional[Decimal] = None
-    unit: Optional[str] = None
-    unit_price: Optional[Decimal] = None
-    discount: Optional[Decimal] = None
-    subtotal: Optional[Decimal] = None
-    tax_rate: Optional[Decimal] = None
-    status: Optional[str] = None
+    @computed_field
+    @property
+    def quantity(self) -> float:
+        return 0.0
 
 
 class InvoiceLineResponse(BaseModel):
@@ -217,6 +326,137 @@ class InvoiceLineResponse(BaseModel):
     page_id: Optional[int] = None
     status: str
     extraction_confidence: float
+    destinations: List[InvoiceLineDestinationResponse] = []
+
+    @field_validator('status', mode='before')
+    @classmethod
+    def normalize_line_status(cls, v: Any) -> str:
+        mapping = {
+            'pending_homologation': 'pending',
+            'pending_review': 'pending',
+            'no_match': 'pending',
+        }
+        return mapping.get(str(v), str(v)) if v is not None else 'pending'
+
+    # Frontend compatibility aliases
+    @computed_field
+    @property
+    def description(self) -> Optional[str]:
+        return self.original_description
+
+    @computed_field
+    @property
+    def vat_rate(self) -> Optional[Decimal]:
+        return self.tax_rate
+
+    @computed_field
+    @property
+    def confidence(self) -> float:
+        return self.extraction_confidence
+
+    @computed_field
+    @property
+    def vat_amount(self) -> Optional[Decimal]:
+        if self.subtotal is not None and self.tax_rate is not None:
+            return (self.subtotal * self.tax_rate / 100).quantize(Decimal('0.01'))
+        return None
+
+    @computed_field
+    @property
+    def total(self) -> Optional[Decimal]:
+        if self.subtotal is not None:
+            vat = self.vat_amount or Decimal('0')
+            return self.subtotal + vat
+        return None
+
+    @computed_field
+    @property
+    def material_id(self) -> Optional[int]:
+        return None
+
+    @computed_field
+    @property
+    def created_at(self) -> Optional[str]:
+        return None
+
+    @computed_field
+    @property
+    def updated_at(self) -> Optional[str]:
+        return None
+
+
+class InvoiceResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    detected_doc_id: Optional[int] = None
+    provider_id: Optional[int] = None
+    tax_id: Optional[str] = None
+    invoice_number: Optional[str] = None
+    invoice_date: Optional[date] = None
+    subtotal: Optional[Decimal] = None
+    vat: Optional[Decimal] = None
+    total: Optional[Decimal] = None
+    currency: str
+    status: str
+    validated_at: Optional[datetime] = None
+    validated_by: Optional[int] = None
+    provider: Optional[ProviderResponse] = None
+    lines: List[InvoiceLineResponse] = []
+
+    @field_validator('status', mode='before')
+    @classmethod
+    def normalize_invoice_status(cls, v: Any) -> str:
+        mapping = {
+            'validated': 'approved',
+            'under_review': 'under_review',
+        }
+        return mapping.get(str(v), str(v)) if v is not None else 'pending_review'
+
+    # Frontend compatibility aliases
+    @computed_field
+    @property
+    def vat_amount(self) -> Optional[Decimal]:
+        return self.vat
+
+    @computed_field
+    @property
+    def reviewed_by(self) -> Optional[int]:
+        return self.validated_by
+
+    @computed_field
+    @property
+    def reviewed_at(self) -> Optional[datetime]:
+        return self.validated_at
+
+    @computed_field
+    @property
+    def confidence(self) -> float:
+        return 0.0
+
+    @computed_field
+    @property
+    def document_id(self) -> Optional[int]:
+        return None
+
+    @computed_field
+    @property
+    def due_date(self) -> Optional[date]:
+        return None
+
+    @computed_field
+    @property
+    def rejection_reason(self) -> Optional[str]:
+        return None
+
+    @computed_field
+    @property
+    def created_at(self) -> Optional[datetime]:
+        return self.validated_at
+
+    @computed_field
+    @property
+    def updated_at(self) -> Optional[datetime]:
+        return self.validated_at
 
 
 # --- Material ---
@@ -296,19 +536,31 @@ class DestinationResponse(BaseModel):
     description: Optional[str] = None
     active: bool
 
+    @computed_field
+    @property
+    def code(self) -> str:
+        return str(self.id)
+
+    @computed_field
+    @property
+    def is_active(self) -> bool:
+        return self.active
+
+    @computed_field
+    @property
+    def created_at(self) -> Optional[str]:
+        return None
+
+    @computed_field
+    @property
+    def updated_at(self) -> Optional[str]:
+        return None
+
 
 class InvoiceLineDestinationCreate(BaseModel):
     destination_id: int
+    quantity: Optional[float] = None
     notes: Optional[str] = None
-
-
-class InvoiceLineDestinationResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: int
-    invoice_line_id: int
-    destination_id: int
-    notes: Optional[str] = None
-    destination: Optional[DestinationResponse] = None
 
 
 # --- Price History ---

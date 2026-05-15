@@ -249,7 +249,6 @@ async def proxy(full_path: str, request: Request):
             return JSONResponse(
                 content=response.json() if response.content else None,
                 status_code=response.status_code,
-                headers=dict(response.headers),
             )
     except httpx.ConnectError:
         raise HTTPException(

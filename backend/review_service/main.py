@@ -48,7 +48,11 @@ async def list_pending_invoices(
 ):
     result = await db.execute(
         select(Invoice)
-        .where(Invoice.status == "pending_review")
+        .options(
+            selectinload(Invoice.provider),
+            selectinload(Invoice.lines),
+        )
+        .where(Invoice.status.in_(["pending_review", "under_review", "rejected"]))
         .order_by(Invoice.id.desc())
         .offset(skip)
         .limit(limit)

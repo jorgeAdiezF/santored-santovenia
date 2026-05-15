@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, status, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from datetime import datetime, date
@@ -113,28 +113,64 @@ async def upload_document(
     return results
 
 
-@app.get("/documents", response_model=List[DocumentResponse])
+@app.get("/documents")
 async def list_documents(
-    skip: int = 0,
-    limit: int = 50,
-    status: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    doc_status: Optional[str] = Query(None, alias="status"),
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
+    search: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    query = select(Document)
+    base_query = select(Document).where(Document.status != "deleted")
 
-    if status:
-        query = query.where(Document.status == status)
+    if doc_status:
+        db_status = "pages_extracted" if doc_status == "processing" else doc_status
+        base_query = base_query.where(Document.status == db_status)
     if date_from:
-        query = query.where(Document.upload_date >= date_from)
+        base_query = base_query.where(Document.upload_date >= date_from)
     if date_to:
-        query = query.where(Document.upload_date <= date_to)
+        base_query = base_query.where(Document.upload_date <= date_to)
+    if search:
+        base_query = base_query.where(Document.filename.ilike(f"%{search}%"))
 
-    query = query.order_by(Document.upload_date.desc()).offset(skip).limit(limit)
-    result = await db.execute(query)
-    return result.scalars().all()
+    count_result = await db.execute(select(func.count()).select_from(base_query.subquery()))
+    total = count_result.scalar_one()
+
+    offset = (page - 1) * size
+    data_query = (
+        base_query
+        .options(selectinload(Document.detected_docs))
+        .order_by(Document.upload_date.desc())
+        .offset(offset)
+        .limit(size)
+    )
+    result = await db.execute(data_query)
+    documents = result.scalars().all()
+
+    items = []
+    for doc in documents:
+        s = doc.status
+        if s == "pages_extracted":
+            s = "processing"
+        items.append({
+            "id": doc.id,
+            "filename": doc.filename,
+            "original_filename": doc.filename,
+            "file_size": doc.file_size,
+            "page_count": doc.page_count,
+            "status": s,
+            "upload_date": doc.upload_date.isoformat() if doc.upload_date else None,
+            "uploaded_by": doc.upload_user_id,
+            "upload_user_id": doc.upload_user_id,
+            "detected_count": len(doc.detected_docs) if doc.detected_docs else 0,
+            "created_at": doc.upload_date.isoformat() if doc.upload_date else None,
+        })
+
+    total_pages = max(1, (total + size - 1) // size)
+    return {"items": items, "total": total, "page": page, "size": size, "pages": total_pages}
 
 
 @app.get("/documents/{document_id}", response_model=DocumentResponse)
