@@ -218,34 +218,14 @@ async def proxy(full_path: str, request: Request):
     headers.pop("connection", None)
 
     try:
-        content_type = request.headers.get("content-type", "")
         async with httpx.AsyncClient(timeout=120.0) as client:
-            if "multipart/form-data" in content_type:
-                form = await request.form()
-                fwd_headers = {k: v for k, v in headers.items() if "content-type" not in k.lower()}
-                httpx_files = []
-                httpx_data = {}
-                for key, value in form.multi_items():
-                    if hasattr(value, "read"):
-                        data = await value.read()
-                        httpx_files.append((key, (value.filename, data, value.content_type or "application/octet-stream")))
-                    else:
-                        httpx_data[key] = str(value)
-                response = await client.request(
-                    method=request.method,
-                    url=target_url,
-                    headers=fwd_headers,
-                    files=httpx_files or None,
-                    data=httpx_data or None,
-                )
-            else:
-                body = await request.body()
-                response = await client.request(
-                    method=request.method,
-                    url=target_url,
-                    headers=headers,
-                    content=body,
-                )
+            body = await request.body()
+            response = await client.request(
+                method=request.method,
+                url=target_url,
+                headers=headers,
+                content=body,
+            )
             return JSONResponse(
                 content=response.json() if response.content else None,
                 status_code=response.status_code,
