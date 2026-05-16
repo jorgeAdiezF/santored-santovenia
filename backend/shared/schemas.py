@@ -278,6 +278,18 @@ class DocumentListItemResponse(BaseModel):
 
 
 # --- Invoice ---
+class InvoiceLineUpdate(BaseModel):
+    supplier_code: Optional[str] = None
+    original_description: Optional[str] = None
+    quantity: Optional[Decimal] = None
+    unit: Optional[str] = None
+    unit_price: Optional[Decimal] = None
+    discount: Optional[Decimal] = None
+    subtotal: Optional[Decimal] = None
+    tax_rate: Optional[Decimal] = None
+    status: Optional[str] = None
+
+
 class InvoiceUpdate(BaseModel):
     provider_id: Optional[int] = None
     tax_id: Optional[str] = None

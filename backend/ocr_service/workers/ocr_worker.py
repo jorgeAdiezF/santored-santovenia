@@ -141,7 +141,10 @@ def process_segment(self, document_id: int, segment_id: int):
     from sqlalchemy import select, update
     from shared.models import DetectedDoc, Invoice, InvoiceLine, Page, Provider
     from services.image_preprocessor import preprocess_image
-    from services.text_extractor import extract_header, extract_table_lines
+    from services.text_extractor import (
+        extract_header, extract_table_lines,
+        is_bank_or_institution, is_invoice_number_valid,
+    )
     from services.pdf_table_extractor import DigitalPDFExtractor, ScannedPDFExtractor
     from services.quality import item_quality_flags, confidence_from_flags
 
@@ -258,6 +261,17 @@ def process_segment(self, document_id: int, segment_id: int):
             header = extract_header(full_text)
 
             # ----------------------------------------------------------------
+            # Validate / sanitise header fields
+            # ----------------------------------------------------------------
+            if header.get("invoice_number") and not is_invoice_number_valid(header["invoice_number"]):
+                print(f"[segment {segment_id}] Discarding invalid invoice_number: {header['invoice_number']!r}")
+                header["invoice_number"] = None
+
+            if header.get("provider_name") and is_bank_or_institution(header["provider_name"]):
+                print(f"[segment {segment_id}] Blocking bank/institution as provider: {header['provider_name']!r}")
+                header["provider_name"] = None
+
+            # ----------------------------------------------------------------
             # Apply quality flags to all extracted lines; update confidence
             # ----------------------------------------------------------------
             for ln in table_lines:
@@ -269,6 +283,12 @@ def process_segment(self, document_id: int, segment_id: int):
                     total_price=ln.get("subtotal"),
                 )
                 ln["extraction_confidence"] = confidence_from_flags(flags)
+
+            # Drop lines whose quality is too low to be useful
+            before_filter = len(table_lines)
+            table_lines = [ln for ln in table_lines if ln.get("extraction_confidence", 0) >= 0.2]
+            if len(table_lines) < before_filter:
+                print(f"[segment {segment_id}] Dropped {before_filter - len(table_lines)} low-confidence lines")
 
             provider_id = None
             if header.get("tax_id") or header.get("provider_name"):

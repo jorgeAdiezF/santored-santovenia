@@ -71,6 +71,52 @@ KNOWN_SUPPLIERS = [
     (re.compile(r"CUMBRE\s+LEON|Rodriguez\s+del\s+Valle", re.I), "CUMBRE LEON ASESORES"),
 ]
 
+# ---------------------------------------------------------------------------
+# Bank / institution detection — these should never be stored as providers
+# ---------------------------------------------------------------------------
+_BANK_INSTITUTION_RE = re.compile(
+    r"\b(banco|bank|caixa|caja\s+de|sabadell|santander|bbva|caixabank|"
+    r"la\s+caixa|bankia|bankinter|abanca|unicaja|kutxabank|ibercaja|"
+    r"cajamar|ing\s+direct|openbank|hacienda|agencia\s+tributaria|"
+    r"seguridad\s+social|ayuntamiento|diputaci[oó]n|junta\s+de|"
+    r"ministerio|patrimonio|administraci[oó]n|tesoreria|recaudaci[oó]n)\b",
+    re.IGNORECASE,
+)
+
+
+def is_bank_or_institution(name: str) -> bool:
+    """True if name looks like a bank or public institution (not a real supplier)."""
+    return bool(_BANK_INSTITUTION_RE.search(name or ""))
+
+
+def is_invoice_number_valid(invoice_number: str) -> bool:
+    """
+    False if the extracted 'invoice number' is actually a date, phone,
+    postal code, year, or other non-invoice value.
+    """
+    if not invoice_number or len(invoice_number) < 3:
+        return False
+    n = invoice_number.strip()
+    # Date formats: DD/MM/YYYY, DD-MM-YYYY, YYYY/MM/DD …
+    if re.match(r"^\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4}$", n):
+        return False
+    # Pure year (1900-2099)
+    if re.match(r"^(19|20)\d{2}$", n):
+        return False
+    # Spanish/EU phone (9-12 digits, no letters)
+    if re.match(r"^\+?[\d\s\-]{9,14}$", n) and not re.search(r"[A-Za-z]", n):
+        return False
+    # Postal code (exactly 5 digits)
+    if re.match(r"^\d{5}$", n):
+        return False
+    # Percentage
+    if re.match(r"^\d{1,3}%$", n):
+        return False
+    # Too long (> 30 chars) — probably noise
+    if len(n) > 30:
+        return False
+    return True
+
 
 def extract_supplier_name(text: str) -> Optional[str]:
     """
@@ -221,9 +267,12 @@ def extract_header(text: str) -> Dict[str, Any]:
         confidence_factors += 1
 
     invoice_number = extract_invoice_number(text)
-    if invoice_number:
+    if invoice_number and is_invoice_number_valid(invoice_number):
         result["invoice_number"] = invoice_number
         confidence_factors += 1
+    elif invoice_number:
+        # Found something but it looks like a date/phone — discard
+        invoice_number = None
 
     invoice_date = extract_date(text)
     if invoice_date:

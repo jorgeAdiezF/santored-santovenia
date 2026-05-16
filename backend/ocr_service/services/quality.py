@@ -23,6 +23,41 @@ NON_PRODUCT_PATTERNS = [
     r"\bpromociones aplicadas\b",
     r"\bdesglose impuestos\b",
     r"\bn\.?i\.?f\.?\b",
+    # Financial / bank references
+    r"\bIBAN\b",
+    r"\bBIC\b",
+    r"\bSWIFT\b",
+    r"\btransferencia\b",
+    r"\bcuenta\s+bancaria\b",
+    r"\bEntidad\s+\d+\b",
+    r"\bES\d{2}\s*[\d\s]{20}\b",
+    # Legal boilerplate
+    r"\bcondiciones\s+de\s+(pago|entrega|venta)\b",
+    r"\bplazo\s+de\s+pago\b",
+    r"\bretenci[oó]n\b",
+    r"\brecargo\s+de\s+equivalencia\b",
+    r"\bconfidencial\b",
+    r"\bley\s+org[aá]nica\b",
+    r"\brgpd\b",
+    r"\bpol[ií]tica\s+de\s+privacidad\b",
+    r"\borgano\s+judicial\b",
+    r"\bnotario\b",
+    # Discount / adjustment rows (not products)
+    r"^\s*descuento\s*(%|\d)",
+    r"\bdescuento\s+comercial\b",
+    r"\bpor\s+ciento\s+descuento\b",
+    r"\brapido\s+pago\b",
+    r"\bpronto\s+pago\b",
+    # Totals / taxes (already filtered but reinforce)
+    r"\btotal\s+con\s+iva\b",
+    r"\bcuota\s+iva\b",
+    r"\btipo\s+impositivo\b",
+    r"\bimporte\s+total\b",
+    r"\bbase\s+gravable\b",
+    # Footers and headers
+    r"\bpor\s+favor\s+conserve\b",
+    r"\boriginal\b.*\bduplicado\b",
+    r"\bcomprobante\b",
 ]
 
 _NON_PRODUCT_RE = re.compile(
@@ -143,9 +178,9 @@ def confidence_from_flags(flags: list) -> float:
     ):
         return 0.05
 
-    # Quantity × price mismatch: concerning but line might still be useful
+    # Quantity × price mismatch: very suspicious — likely OCR column misalignment
     if any("cantidad x precio" in f for f in flags):
-        return 0.55
+        return 0.35
 
     # Unusual values or oversized numbers
     if any(("demasiado" in f or "inusual" in f) for f in flags):

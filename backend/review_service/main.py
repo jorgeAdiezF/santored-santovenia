@@ -175,11 +175,29 @@ async def finalize_invoice(
     if invoice.status not in ("pending_review", "rejected"):
         raise BadRequestError(f"Invoice cannot be finalized from status '{invoice.status}'")
 
+    if not invoice.provider_id:
+        raise BadRequestError("Invoice must have a provider assigned before finalizing")
+
+    if not invoice.invoice_number:
+        raise BadRequestError("Invoice must have a valid invoice number before finalizing")
+
     pending_lines = [l for l in invoice.lines if l.status == "pending_homologation"]
     if pending_lines:
         raise BadRequestError(
             f"Invoice has {len(pending_lines)} line(s) still pending homologation"
         )
+
+    # Arithmetic check: subtotal + vat should be within 1% of total
+    if invoice.subtotal is not None and invoice.vat is not None and invoice.total is not None:
+        from decimal import Decimal
+        computed = invoice.subtotal + invoice.vat
+        diff = abs(computed - invoice.total)
+        tolerance = invoice.total * Decimal("0.01") if invoice.total else Decimal("0.01")
+        if diff > tolerance:
+            raise BadRequestError(
+                f"Invoice arithmetic mismatch: subtotal ({invoice.subtotal}) + vat ({invoice.vat}) "
+                f"= {computed}, but total is {invoice.total}"
+            )
 
     invoice.status = "validated"
     invoice.validated_at = datetime.now(timezone.utc)
