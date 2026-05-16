@@ -653,11 +653,26 @@ class SpendingByProviderResponse(BaseModel):
     total_spend: Decimal
     invoice_count: int
 
+    @computed_field
+    @property
+    def total(self) -> Decimal:
+        return self.total_spend
+
+    @computed_field
+    @property
+    def percentage(self) -> float:
+        return 0.0
+
 
 class SpendingByFamilyResponse(BaseModel):
     family: str
     total_spend: Decimal
     line_count: int
+
+    @computed_field
+    @property
+    def total(self) -> Decimal:
+        return self.total_spend
 
 
 # --- Homologation ---

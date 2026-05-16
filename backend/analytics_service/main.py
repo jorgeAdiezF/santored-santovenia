@@ -12,7 +12,7 @@ from decimal import Decimal
 
 from shared.database import get_db
 from shared.models import (
-    Invoice, InvoiceLine, MaterialMaster, Provider, PriceHistory, User
+    Invoice, InvoiceLine, MaterialMaster, Provider, PriceHistory, User, Document
 )
 from shared.auth import get_current_user
 from shared.schemas import (
@@ -256,28 +256,25 @@ async def get_provider_comparison(
     }
 
 
-@app.get("/analytics/dashboard", response_model=DashboardResponse)
+@app.get("/analytics/dashboard")
 async def get_dashboard(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    from datetime import date, timedelta
+
+    today = date.today()
+    current_month_start = today.replace(day=1)
+
     total_invoices_result = await db.execute(select(func.count(Invoice.id)))
     total_invoices = total_invoices_result.scalar() or 0
 
     pending_result = await db.execute(
-        select(func.count(Invoice.id)).where(Invoice.status == "pending_review")
-    )
-    pending_review = pending_result.scalar() or 0
-
-    from datetime import date
-    current_month_start = date.today().replace(day=1)
-    validated_month_result = await db.execute(
         select(func.count(Invoice.id)).where(
-            Invoice.status == "validated",
-            Invoice.validated_at >= current_month_start,
+            Invoice.status.in_(["pending_review", "under_review", "rejected"])
         )
     )
-    validated_this_month = validated_month_result.scalar() or 0
+    pending_review = pending_result.scalar() or 0
 
     spend_result = await db.execute(
         select(func.sum(Invoice.total)).where(
@@ -285,22 +282,101 @@ async def get_dashboard(
             Invoice.invoice_date >= current_month_start,
         )
     )
-    total_spend = spend_result.scalar()
+    total_spend = float(spend_result.scalar() or 0)
 
     pending_lines_result = await db.execute(
         select(func.count(InvoiceLine.id)).where(
-            InvoiceLine.status == "pending_homologation"
+            InvoiceLine.status.in_(["pending_homologation", "no_match"])
         )
     )
-    pending_homologation_lines = pending_lines_result.scalar() or 0
+    pending_homologation = pending_lines_result.scalar() or 0
 
-    return DashboardResponse(
-        total_invoices=total_invoices,
-        pending_review=pending_review,
-        validated_this_month=validated_this_month,
-        total_spend_this_month=total_spend,
-        pending_homologation_lines=pending_homologation_lines,
+    # Monthly spend for last 6 months
+    invoices_by_month = []
+    for i in range(5, -1, -1):
+        if today.month - i <= 0:
+            month_num = today.month - i + 12
+            year = today.year - 1
+        else:
+            month_num = today.month - i
+            year = today.year
+        month_start = date(year, month_num, 1)
+        if month_num == 12:
+            month_end = date(year + 1, 1, 1)
+        else:
+            month_end = date(year, month_num + 1, 1)
+
+        month_result = await db.execute(
+            select(func.sum(Invoice.total), func.count(Invoice.id)).where(
+                Invoice.status == "validated",
+                Invoice.invoice_date >= month_start,
+                Invoice.invoice_date < month_end,
+            )
+        )
+        row = month_result.one()
+        invoices_by_month.append({
+            "month": month_start.strftime("%Y-%m"),
+            "total": float(row[0] or 0),
+            "count": row[1] or 0,
+        })
+
+    # Spending by provider
+    provider_query = (
+        select(
+            Provider.id,
+            Provider.fiscal_name,
+            func.sum(Invoice.total).label("total"),
+        )
+        .join(Invoice, Invoice.provider_id == Provider.id)
+        .where(Invoice.status == "validated")
+        .group_by(Provider.id, Provider.fiscal_name)
+        .order_by(func.sum(Invoice.total).desc())
+        .limit(10)
     )
+    provider_result = await db.execute(provider_query)
+    spending_by_provider = [
+        {"provider_id": row[0], "provider_name": row[1], "total": float(row[2] or 0), "percentage": 0.0}
+        for row in provider_result.fetchall()
+    ]
+    # Compute percentages
+    all_provider_total = sum(p["total"] for p in spending_by_provider)
+    if all_provider_total > 0:
+        for p in spending_by_provider:
+            p["percentage"] = round(p["total"] / all_provider_total * 100, 1)
+
+    # Recent documents
+    recent_docs_result = await db.execute(
+        select(Document)
+        .where(Document.status != "deleted")
+        .order_by(Document.upload_date.desc())
+        .limit(5)
+    )
+    recent_docs = []
+    for doc in recent_docs_result.scalars().all():
+        s = doc.status
+        if s == "pages_extracted":
+            s = "processing"
+        recent_docs.append({
+            "id": doc.id,
+            "filename": doc.filename,
+            "original_filename": doc.filename,
+            "file_size": doc.file_size,
+            "page_count": doc.page_count,
+            "status": s,
+            "upload_date": doc.upload_date.isoformat() if doc.upload_date else None,
+            "uploaded_by": doc.upload_user_id,
+            "detected_count": 0,
+        })
+
+    return {
+        "total_invoices": total_invoices,
+        "pending_review": pending_review,
+        "total_spent_this_month": total_spend,
+        "pending_homologation": pending_homologation,
+        "invoices_by_month": invoices_by_month,
+        "spending_by_provider": spending_by_provider,
+        "recent_documents": recent_docs,
+    }
 
 
 @app.get("/analytics/spending-by-provider", response_model=List[SpendingByProviderResponse])
