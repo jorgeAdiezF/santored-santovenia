@@ -292,6 +292,69 @@ async def get_document_segments(
     return result.scalars().all()
 
 
+@app.post("/documents/{document_id}/segments/{segment_id}/confirm", response_model=DetectedDocResponse)
+async def confirm_segment(
+    document_id: int,
+    segment_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(DetectedDoc).where(
+            DetectedDoc.id == segment_id,
+            DetectedDoc.document_id == document_id,
+        )
+    )
+    segment = result.scalar_one_or_none()
+    if not segment:
+        raise NotFoundError("Segment", segment_id)
+
+    segment.status = "confirmed"
+    await db.flush()
+
+    try:
+        celery_app.send_task(
+            "ocr_worker.process_segment",
+            args=[document_id, segment_id],
+            queue="ocr",
+        )
+    except Exception as e:
+        print(f"Warning: Failed to trigger OCR for segment {segment_id}: {e}")
+
+    return segment
+
+
+@app.post("/documents/{document_id}/ocr")
+async def trigger_ocr(
+    document_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(select(Document).where(Document.id == document_id))
+    document = result.scalar_one_or_none()
+    if not document:
+        raise NotFoundError("Document", document_id)
+
+    result = await db.execute(
+        select(DetectedDoc).where(DetectedDoc.document_id == document_id)
+    )
+    segments = result.scalars().all()
+
+    triggered = 0
+    for segment in segments:
+        try:
+            celery_app.send_task(
+                "ocr_worker.process_segment",
+                args=[document_id, segment.id],
+                queue="ocr",
+            )
+            triggered += 1
+        except Exception as e:
+            print(f"Warning: Failed to trigger OCR for segment {segment.id}: {e}")
+
+    return {"message": f"OCR triggered for {triggered} segment(s)", "document_id": document_id}
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8002)
