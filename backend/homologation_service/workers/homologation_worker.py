@@ -94,7 +94,8 @@ def homologate_lines(self, invoice_id: int, line_ids: list):
                     )
                     invoice = invoice_result.scalar_one_or_none()
 
-                    if invoice and invoice.invoice_date:
+                    # Only record price history from validated invoices
+                    if invoice and invoice.invoice_date and invoice.status == "validated":
                         price_entry = PriceHistory(
                             material_id=best["material_id"],
                             provider_id=invoice.provider_id or 1,

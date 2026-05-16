@@ -125,7 +125,7 @@ def trigger_homologation(invoice_id: int, line_ids: list) -> None:
     """Trigger homologation Celery task for extracted invoice lines."""
     try:
         celery_app.send_task(
-            "homologation_worker.process_invoice_lines",
+            "homologation_worker.homologate_lines",
             args=[invoice_id, line_ids],
             queue="homologation",
         )
