@@ -44,6 +44,16 @@ class UserResponse(BaseModel):
     active: bool
     role: Optional[RoleResponse] = None
 
+    @computed_field
+    @property
+    def full_name(self) -> Optional[str]:
+        return self.name
+
+    @computed_field
+    @property
+    def is_active(self) -> bool:
+        return self.active
+
 
 # --- Auth ---
 class LoginRequest(BaseModel):
@@ -92,6 +102,11 @@ class ProviderAliasResponse(BaseModel):
     id: int
     provider_id: int
     alias_text: str
+
+    @computed_field
+    @property
+    def alias_name(self) -> str:
+        return self.alias_text
 
 
 class ProviderResponse(BaseModel):
@@ -510,6 +525,16 @@ class MaterialAliasResponse(BaseModel):
     confidence: float
     created_at: Optional[datetime] = None
 
+    @computed_field
+    @property
+    def alias_description(self) -> Optional[str]:
+        return self.supplier_description
+
+    @computed_field
+    @property
+    def source(self) -> str:
+        return "invoice"
+
 
 class MaterialResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -525,6 +550,21 @@ class MaterialResponse(BaseModel):
     active: bool
     created_at: Optional[datetime] = None
     aliases: List[MaterialAliasResponse] = []
+
+    @computed_field
+    @property
+    def is_active(self) -> bool:
+        return self.active
+
+    @computed_field
+    @property
+    def aliases_count(self) -> int:
+        return len(self.aliases)
+
+    @computed_field
+    @property
+    def updated_at(self) -> Optional[datetime]:
+        return self.created_at
 
 
 # --- Destination ---
