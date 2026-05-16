@@ -4,6 +4,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from fastapi import FastAPI, Depends, HTTPException, status, Query
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -209,9 +210,14 @@ async def finalize_invoice(
     return invoice
 
 
+class RejectRequest(BaseModel):
+    reason: Optional[str] = None
+
+
 @app.post("/reviews/invoices/{invoice_id}/reject", response_model=InvoiceResponse)
 async def reject_invoice(
     invoice_id: int,
+    body: Optional[RejectRequest] = None,
     reason: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -221,10 +227,11 @@ async def reject_invoice(
     if not invoice:
         raise NotFoundError("Invoice", invoice_id)
 
+    effective_reason = reason or (body.reason if body else None)
     invoice.status = "rejected"
     await db.flush()
     await record_audit(db, "reject", "invoice", invoice.id, current_user.id,
-                       new_value={"status": "rejected"}, notes=reason)
+                       new_value={"status": "rejected"}, notes=effective_reason)
     return invoice
 
 
