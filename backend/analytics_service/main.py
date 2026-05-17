@@ -416,7 +416,7 @@ async def get_spending_by_provider(
     ]
 
 
-@app.get("/analytics/spending-by-family", response_model=List[SpendingByFamilyResponse])
+@app.get("/analytics/spending-by-family")
 async def get_spending_by_family(
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
