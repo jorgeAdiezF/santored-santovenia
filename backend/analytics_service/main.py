@@ -276,7 +276,7 @@ async def get_dashboard(
 
     spend_result = await db.execute(
         select(func.sum(Invoice.total)).where(
-            Invoice.status == "validated",
+            Invoice.status.in_(["approved", "validated"]),
             Invoice.invoice_date >= current_month_start,
         )
     )
@@ -306,7 +306,7 @@ async def get_dashboard(
 
         month_result = await db.execute(
             select(func.sum(Invoice.total), func.count(Invoice.id)).where(
-                Invoice.status == "validated",
+                Invoice.status.in_(["approved", "validated"]),
                 Invoice.invoice_date >= month_start,
                 Invoice.invoice_date < month_end,
             )
@@ -326,7 +326,7 @@ async def get_dashboard(
             func.sum(Invoice.total).label("total"),
         )
         .join(Invoice, Invoice.provider_id == Provider.id)
-        .where(Invoice.status == "validated")
+        .where(Invoice.status.in_(["approved", "validated"]))
         .group_by(Provider.id, Provider.fiscal_name)
         .order_by(func.sum(Invoice.total).desc())
         .limit(10)
@@ -392,7 +392,7 @@ async def get_spending_by_provider(
             func.count(Invoice.id).label("invoice_count"),
         )
         .join(Invoice, Invoice.provider_id == Provider.id)
-        .where(Invoice.status == "validated")
+        .where(Invoice.status.in_(["approved", "validated"]))
         .group_by(Provider.id, Provider.fiscal_name)
         .order_by(func.sum(Invoice.total).desc())
     )
@@ -432,7 +432,7 @@ async def get_spending_by_family(
         .join(PriceHistory, PriceHistory.invoice_line_id == InvoiceLine.id)
         .join(MaterialMaster, MaterialMaster.id == PriceHistory.material_id)
         .join(Invoice, Invoice.id == InvoiceLine.invoice_id)
-        .where(Invoice.status == "validated")
+        .where(Invoice.status.in_(["approved", "validated"]))
         .where(MaterialMaster.family.isnot(None))
         .group_by(MaterialMaster.family)
         .order_by(func.sum(InvoiceLine.subtotal).desc())
