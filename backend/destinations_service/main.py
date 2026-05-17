@@ -2,12 +2,12 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
-from typing import List
+from typing import List, Optional
 
 from shared.database import get_db
 from shared.models import Destination, InvoiceLineDestination, InvoiceLine, User
@@ -38,20 +38,29 @@ async def health():
     return {"status": "ok", "service": "destinations_service"}
 
 
-@app.get("/destinations", response_model=List[DestinationResponse])
+@app.get("/destinations")
 async def list_destinations(
-    skip: int = 0,
-    limit: int = 100,
+    page: int = 1,
+    size: int = 50,
+    search: Optional[str] = Query(None),
     active_only: bool = True,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    from sqlalchemy import func as sqlfunc
     query = select(Destination)
     if active_only:
         query = query.where(Destination.active == True)
-    query = query.order_by(Destination.name).offset(skip).limit(limit)
-    result = await db.execute(query)
-    return result.scalars().all()
+    if search:
+        query = query.where(Destination.name.ilike(f"%{search}%"))
+    count_result = await db.execute(select(sqlfunc.count()).select_from(query.subquery()))
+    total = count_result.scalar_one()
+    offset = (page - 1) * size
+    result = await db.execute(query.order_by(Destination.name).offset(offset).limit(size))
+    items = result.scalars().all()
+    pages = max(1, (total + size - 1) // size)
+    serialized = [DestinationResponse.model_validate(d).model_dump() for d in items]
+    return {"items": serialized, "total": total, "page": page, "size": size, "pages": pages}
 
 
 @app.post("/destinations", response_model=DestinationResponse, status_code=status.HTTP_201_CREATED)
