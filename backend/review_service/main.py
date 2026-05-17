@@ -40,25 +40,33 @@ async def health():
     return {"status": "ok", "service": "review_service"}
 
 
-@app.get("/reviews/invoices/pending", response_model=List[InvoiceResponse])
+@app.get("/reviews/invoices/pending")
 async def list_pending_invoices(
+    page: int = 1,
+    size: int = 50,
     skip: int = 0,
-    limit: int = 50,
+    limit: int = 0,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    from sqlalchemy import func as sqlfunc
+    base_q = select(Invoice).where(Invoice.status.in_(["pending_review", "under_review", "rejected"]))
+    count_result = await db.execute(select(sqlfunc.count()).select_from(base_q.subquery()))
+    total = count_result.scalar_one()
+
+    offset = skip if limit > 0 else (page - 1) * size
+    page_size = limit if limit > 0 else size
+
     result = await db.execute(
-        select(Invoice)
-        .options(
-            selectinload(Invoice.provider),
-            selectinload(Invoice.lines),
-        )
-        .where(Invoice.status.in_(["pending_review", "under_review", "rejected"]))
+        base_q
+        .options(selectinload(Invoice.provider), selectinload(Invoice.lines))
         .order_by(Invoice.id.desc())
-        .offset(skip)
-        .limit(limit)
+        .offset(offset)
+        .limit(page_size)
     )
-    return result.scalars().all()
+    invoices = result.scalars().all()
+    pages = max(1, (total + page_size - 1) // page_size)
+    return {"items": invoices, "total": total, "page": page, "size": page_size, "pages": pages}
 
 
 @app.get("/reviews/invoices/{invoice_id}")
@@ -69,41 +77,47 @@ async def get_invoice_detail(
 ):
     result = await db.execute(
         select(Invoice)
-        .options(selectinload(Invoice.lines))
+        .options(selectinload(Invoice.lines), selectinload(Invoice.provider))
         .where(Invoice.id == invoice_id)
     )
     invoice = result.scalar_one_or_none()
     if not invoice:
         raise NotFoundError("Invoice", invoice_id)
 
+    provider = invoice.provider
     return {
         "id": invoice.id,
         "detected_doc_id": invoice.detected_doc_id,
         "provider_id": invoice.provider_id,
+        "provider_name": provider.fiscal_name if provider else None,
         "tax_id": invoice.tax_id,
         "invoice_number": invoice.invoice_number,
         "invoice_date": str(invoice.invoice_date) if invoice.invoice_date else None,
-        "subtotal": str(invoice.subtotal) if invoice.subtotal else None,
-        "vat": str(invoice.vat) if invoice.vat else None,
-        "total": str(invoice.total) if invoice.total else None,
-        "currency": invoice.currency,
+        "subtotal": float(invoice.subtotal) if invoice.subtotal is not None else None,
+        "vat": float(invoice.vat) if invoice.vat is not None else None,
+        "total": float(invoice.total) if invoice.total is not None else None,
+        "currency": invoice.currency or "EUR",
         "status": invoice.status,
         "validated_at": invoice.validated_at.isoformat() if invoice.validated_at else None,
         "validated_by": invoice.validated_by,
         "lines": [
             {
                 "id": line.id,
+                "invoice_id": invoice.id,
                 "line_number": line.line_number,
                 "supplier_code": line.supplier_code,
-                "original_description": line.original_description,
-                "quantity": str(line.quantity) if line.quantity else None,
+                "original_description": line.original_description or "",
+                "quantity": float(line.quantity) if line.quantity is not None else None,
                 "unit": line.unit,
-                "unit_price": str(line.unit_price) if line.unit_price else None,
-                "discount": str(line.discount) if line.discount else None,
-                "subtotal": str(line.subtotal) if line.subtotal else None,
-                "tax_rate": str(line.tax_rate) if line.tax_rate else None,
-                "status": line.status,
-                "extraction_confidence": line.extraction_confidence,
+                "unit_price": float(line.unit_price) if line.unit_price is not None else None,
+                "discount": float(line.discount) if line.discount is not None else None,
+                "subtotal": float(line.subtotal) if line.subtotal is not None else None,
+                "tax_rate": float(line.tax_rate) if line.tax_rate is not None else None,
+                "status": line.status or "pending_homologation",
+                "confidence": float(line.extraction_confidence) if line.extraction_confidence is not None else 0.5,
+                "extraction_confidence": float(line.extraction_confidence) if line.extraction_confidence is not None else 0.5,
+                "material_id": line.material_id,
+                "homologated_description": line.homologated_description,
             }
             for line in invoice.lines
         ],
