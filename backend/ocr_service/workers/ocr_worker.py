@@ -361,7 +361,7 @@ def process_segment(self, document_id: int, segment_id: int):
                 line_ids.append(invoice_line.id)
 
             await session.execute(
-                update(DetectedDoc).where(DetectedDoc.id == segment_id).values(status="ocr_complete")
+                update(DetectedDoc).where(DetectedDoc.id == segment_id).values(status="ocr_done")
             )
             await session.commit()
 
