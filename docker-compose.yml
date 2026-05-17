@@ -341,7 +341,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "13001:80"
+      - "3001:80"
     depends_on:
       - api_gateway
     networks:
