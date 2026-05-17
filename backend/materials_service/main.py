@@ -76,7 +76,7 @@ async def search_materials(
     return result.scalars().all()
 
 
-@app.get("/materials/families", response_model=List[str])
+@app.get("/materials/families")
 async def list_families(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -87,7 +87,42 @@ async def list_families(
             MaterialMaster.active == True,
         ).distinct()
     )
-    return [row[0] for row in result.all() if row[0]]
+    families = [row[0] for row in result.all() if row[0]]
+    return [{"id": i + 1, "code": name, "name": name} for i, name in enumerate(sorted(families))]
+
+
+@app.get("/materials")
+async def list_materials_paginated(
+    page: int = 1,
+    size: int = 20,
+    search: Optional[str] = Query(None),
+    family: Optional[str] = Query(None),
+    active_only: bool = True,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from sqlalchemy import func as sqlfunc
+    query = select(MaterialMaster).options(selectinload(MaterialMaster.aliases))
+    if active_only:
+        query = query.where(MaterialMaster.active == True)
+    if search:
+        query = query.where(
+            or_(
+                MaterialMaster.normalized_description.ilike(f"%{search}%"),
+                MaterialMaster.master_code.ilike(f"%{search}%"),
+            )
+        )
+    if family:
+        query = query.where(MaterialMaster.family.ilike(f"%{family}%"))
+
+    count_result = await db.execute(select(sqlfunc.count()).select_from(query.subquery()))
+    total = count_result.scalar_one()
+
+    offset = (page - 1) * size
+    result = await db.execute(query.offset(offset).limit(size))
+    items = result.scalars().all()
+    pages = max(1, (total + size - 1) // size)
+    return {"items": items, "total": total, "page": page, "size": size, "pages": pages}
 
 
 @app.post("/materials", response_model=MaterialResponse, status_code=status.HTTP_201_CREATED)
@@ -231,15 +266,18 @@ async def remove_material_alias(
 
 # ---- Providers endpoints ----
 
-@app.get("/providers", response_model=List[ProviderResponse])
+@app.get("/providers")
 async def list_providers(
+    page: int = 1,
+    size: int = 20,
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 0,
     active_only: bool = True,
     search: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    from sqlalchemy import func as sqlfunc
     query = select(Provider).options(selectinload(Provider.aliases))
     if active_only:
         query = query.where(Provider.active == True)
@@ -250,9 +288,21 @@ async def list_providers(
                 Provider.tax_id.ilike(f"%{search}%"),
             )
         )
-    query = query.offset(skip).limit(limit)
-    result = await db.execute(query)
-    return result.scalars().all()
+    count_result = await db.execute(select(sqlfunc.count()).select_from(query.subquery()))
+    total = count_result.scalar_one()
+
+    # Support both legacy skip/limit and new page/size params
+    if limit > 0:
+        offset = skip
+        page_size = limit
+    else:
+        page_size = size
+        offset = (page - 1) * size
+
+    result = await db.execute(query.offset(offset).limit(page_size))
+    items = result.scalars().all()
+    pages = max(1, (total + page_size - 1) // page_size)
+    return {"items": items, "total": total, "page": page, "size": page_size, "pages": pages}
 
 
 @app.post("/providers", response_model=ProviderResponse, status_code=status.HTTP_201_CREATED)

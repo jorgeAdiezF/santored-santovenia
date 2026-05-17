@@ -196,11 +196,12 @@ async def get_materials_stats(
         {
             "material_id": row[0],
             "master_code": row[1],
-            "family": row[2],
             "normalized_description": row[3],
-            "purchase_count": row[4] or 0,
-            "total_quantity": str(row[5]) if row[5] else "0",
-            "avg_unit_price": str(row[6]) if row[6] else None,
+            "invoice_count": row[4] or 0,
+            "total_quantity": float(row[5]) if row[5] else 0.0,
+            "avg_price": float(row[6]) if row[6] else 0.0,
+            "total_spend": float((row[5] or 0) * (row[6] or 0)),
+            "currency": "EUR",
         }
         for row in rows
     ]
@@ -238,22 +239,19 @@ async def get_provider_comparison(
     result = await db.execute(query)
     rows = result.fetchall()
 
-    return {
-        "material_id": material_id,
-        "material_description": material.normalized_description,
-        "providers": [
-            {
-                "provider_id": row[0],
-                "provider_name": row[1],
-                "avg_price": str(row[2]) if row[2] else None,
-                "min_price": str(row[3]) if row[3] else None,
-                "max_price": str(row[4]) if row[4] else None,
-                "purchase_count": row[5],
-                "last_purchase": str(row[6]) if row[6] else None,
-            }
-            for row in rows
-        ],
-    }
+    return [
+        {
+            "provider_id": row[0],
+            "provider_name": row[1],
+            "avg_price": float(row[2]) if row[2] else 0.0,
+            "min_price": float(row[3]) if row[3] else 0.0,
+            "max_price": float(row[4]) if row[4] else 0.0,
+            "purchase_count": row[5],
+            "last_price": float(row[2]) if row[2] else 0.0,
+            "last_date": str(row[6]) if row[6] else None,
+        }
+        for row in rows
+    ]
 
 
 @app.get("/analytics/dashboard")
@@ -448,14 +446,20 @@ async def get_spending_by_family(
     result = await db.execute(query)
     rows = result.fetchall()
 
-    return [
-        SpendingByFamilyResponse(
-            family=row[0] or "Unknown",
-            total_spend=row[1] or Decimal("0"),
-            line_count=row[2],
-        )
-        for row in rows
+    items = [
+        {
+            "family_id": i + 1,
+            "family_name": row[0] or "Desconocida",
+            "total": float(row[1] or 0),
+            "percentage": 0.0,
+        }
+        for i, row in enumerate(rows)
     ]
+    grand_total = sum(p["total"] for p in items)
+    if grand_total > 0:
+        for p in items:
+            p["percentage"] = round(p["total"] / grand_total * 100, 1)
+    return items
 
 
 if __name__ == "__main__":

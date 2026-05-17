@@ -95,7 +95,7 @@ export default function DocumentDetail() {
       title: 'Type',
       dataIndex: 'doc_type',
       key: 'doc_type',
-      render: (t) => <Tag>{t.toUpperCase()}</Tag>,
+      render: (t) => <Tag>{t ? t.toUpperCase() : 'INVOICE'}</Tag>,
     },
     {
       title: 'Pages',
@@ -109,6 +109,7 @@ export default function DocumentDetail() {
       key: 'confidence',
       width: 110,
       render: (c) => {
+        if (c == null) return <Text type="secondary">—</Text>;
         const pct = (c * 100).toFixed(0);
         const color = c >= 0.9 ? '#52c41a' : c >= 0.7 ? '#fa8c16' : '#f5222d';
         return <Text style={{ color }}>{pct}%</Text>;

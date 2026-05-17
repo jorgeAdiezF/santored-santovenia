@@ -150,7 +150,7 @@ export default function Dashboard() {
       width: 130,
       render: (status) => (
         <Tag color={statusColors[status] || 'default'}>
-          {statusLabels[status] || status.replace('_', ' ').toUpperCase()}
+          {statusLabels[status] || (status ? status.replace('_', ' ').toUpperCase() : '—')}
         </Tag>
       ),
     },

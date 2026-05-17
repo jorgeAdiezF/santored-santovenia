@@ -232,7 +232,7 @@ function AssignDestinationModal({ open, line, invoiceId, onClose }: AssignDestin
     setLoadingDest(true);
     try {
       const result = await listDestinations({ search, size: 50 });
-      setDestinations(result.items.map((d) => ({ value: d.id, label: `[${d.code}] ${d.name}` })));
+      setDestinations((result?.items ?? []).map((d) => ({ value: d.id, label: `[${d.code}] ${d.name}` })));
     } finally {
       setLoadingDest(false);
     }
@@ -669,8 +669,8 @@ export default function InvoiceReview() {
               scroll={{ x: 1200 }}
               pagination={false}
               rowClassName={(record) => {
-                if (record.confidence < 0.7) return 'row-low-confidence';
-                if (record.confidence < 0.9) return 'row-medium-confidence';
+                if (record.confidence != null && record.confidence < 0.7) return 'row-low-confidence';
+                if (record.confidence != null && record.confidence < 0.9) return 'row-medium-confidence';
                 return '';
               }}
             />
