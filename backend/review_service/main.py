@@ -255,13 +255,13 @@ async def finalize_invoice(
                 f"= {computed}, but total is {invoice.total}"
             )
 
-    invoice.status = "validated"
+    invoice.status = "approved"
     invoice.validated_at = datetime.now(timezone.utc)
     invoice.validated_by = current_user.id
 
     await db.flush()
     await record_audit(db, "validate", "invoice", invoice.id, current_user.id,
-                       new_value={"status": "validated"})
+                       new_value={"status": "approved"})
     return invoice
 
 

@@ -368,7 +368,7 @@ export default function InvoiceReview() {
     }
   };
 
-  const isReadOnly = invoice.status === 'approved' || invoice.status === 'rejected' || invoice.status === 'exported';
+  const isReadOnly = invoice.status === 'approved' || invoice.status === 'rejected' || invoice.status === 'exported' || (invoice.status as string) === 'validated';
 
   const lineColumns: ColumnsType<InvoiceLine> = [
     {
