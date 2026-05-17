@@ -122,7 +122,8 @@ async def list_materials_paginated(
     result = await db.execute(query.offset(offset).limit(size))
     items = result.scalars().all()
     pages = max(1, (total + size - 1) // size)
-    return {"items": items, "total": total, "page": page, "size": size, "pages": pages}
+    serialized = [MaterialResponse.model_validate(m).model_dump() for m in items]
+    return {"items": serialized, "total": total, "page": page, "size": size, "pages": pages}
 
 
 @app.post("/materials", response_model=MaterialResponse, status_code=status.HTTP_201_CREATED)
@@ -302,7 +303,8 @@ async def list_providers(
     result = await db.execute(query.offset(offset).limit(page_size))
     items = result.scalars().all()
     pages = max(1, (total + page_size - 1) // page_size)
-    return {"items": items, "total": total, "page": page, "size": page_size, "pages": pages}
+    serialized = [ProviderResponse.model_validate(p).model_dump() for p in items]
+    return {"items": serialized, "total": total, "page": page, "size": page_size, "pages": pages}
 
 
 @app.post("/providers", response_model=ProviderResponse, status_code=status.HTTP_201_CREATED)
