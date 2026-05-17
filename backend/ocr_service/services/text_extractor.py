@@ -118,6 +118,20 @@ def is_invoice_number_valid(invoice_number: str) -> bool:
     return True
 
 
+_SUPPLIER_HEURISTIC_PATTERNS = [
+    re.compile(r"(?:proveedor|vendor|supplier)[:\s]+([^\n]{5,100})", re.IGNORECASE),
+    re.compile(r"(?:expedido\s+por|emitido\s+por|facturado\s+por)[:\s]+([^\n]{5,100})", re.IGNORECASE),
+    re.compile(r"(?:raz[oó]n\s+social|empresa|entidad)[:\s]+([^\n]{5,100})", re.IGNORECASE),
+    re.compile(r"(?:de|from)[:\s]+([A-ZÁÉÍÓÚÑ][^\n]{5,80}(?:S\.?L\.?U?\.?|S\.?A\.?U?\.?|S\.?\s*COOP|S\.?L\.|SLU|SAU?))\b", re.IGNORECASE),
+    re.compile(r"^([A-ZÁÉÍÓÚÑ][^\n]{5,80}(?:S\.?L\.?U?\.?|S\.?A\.?U?\.?|S\.?\s*COOP|SLU|SAU?))[\s,\.]*$", re.MULTILINE | re.IGNORECASE),
+]
+
+_COMPANY_FORM_RE = re.compile(
+    r"\b(?:S\.?L\.?U?\.?|S\.?A\.?U?\.?|S\.?\s*COOP|S\.?R\.?L\.?|SLU|SAU?|GMBH|INC\.?|LTD\.?)\b",
+    re.IGNORECASE,
+)
+
+
 def extract_supplier_name(text: str) -> Optional[str]:
     """
     Try known supplier patterns first, then fall back to heuristics.
@@ -127,11 +141,19 @@ def extract_supplier_name(text: str) -> Optional[str]:
     for pattern, canonical in KNOWN_SUPPLIERS:
         if pattern.search(text):
             return canonical
-    # 2. Try "Proveedor: X" pattern
-    m = re.search(r"Proveedor\s*:\s*(.+)", text, re.IGNORECASE)
-    if m:
-        return m.group(1).strip()[:100]
-    # 3. Return None (let the caller handle)
+    # 2. Try expanded Spanish heuristic patterns
+    for pattern in _SUPPLIER_HEURISTIC_PATTERNS:
+        m = pattern.search(text)
+        if m:
+            name = m.group(1).strip()[:100]
+            if len(name) >= 5 and not is_bank_or_institution(name):
+                return name
+    # 3. Look for any line containing a company form suffix near the top
+    lines = text.split("\n")
+    for line in lines[:20]:
+        line = line.strip()
+        if _COMPANY_FORM_RE.search(line) and 5 <= len(line) <= 100 and not is_bank_or_institution(line):
+            return line
     return None
 
 # Date patterns
@@ -159,12 +181,19 @@ PROVIDER_PATTERNS = [
 ]
 
 
+def normalize_tax_id(tax_id: str) -> Optional[str]:
+    """Strip hyphens, spaces, dots and uppercase. Returns None if empty."""
+    if not tax_id:
+        return None
+    return re.sub(r"[\s\-\.]", "", tax_id.strip().upper()) or None
+
+
 def extract_tax_id(text: str) -> Optional[str]:
     """Extract the first valid Spanish tax ID from text."""
     for pattern in [CIF_PATTERN, NIF_PATTERN, NIE_PATTERN]:
         match = pattern.search(text)
         if match:
-            return match.group(0).upper()
+            return normalize_tax_id(match.group(0))
     return None
 
 

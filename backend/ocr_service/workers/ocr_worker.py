@@ -65,21 +65,31 @@ def run_ocr_on_pages(pages: list) -> str:
     return "\n".join(full_text)
 
 
-FUZZY_PROVIDER_THRESHOLD = 80  # rapidfuzz score 0-100
+FUZZY_PROVIDER_THRESHOLD = 70  # rapidfuzz score 0-100
+
+
+def _normalize_tax_id(tax_id: str) -> str:
+    """Strip hyphens, spaces, dots; uppercase."""
+    import re
+    if not tax_id:
+        return ""
+    return re.sub(r"[\s\-\.]", "", tax_id.strip().upper())
 
 
 async def find_or_create_provider(session, tax_id: str, provider_name: str = None):
-    """Find existing provider by tax_id, fuzzy name match, or create new one."""
+    """Find existing provider by tax_id (normalized), fuzzy name match, or create new."""
     from sqlalchemy import select
     from shared.models import Provider
 
-    if tax_id:
-        result = await session.execute(
-            select(Provider).where(Provider.tax_id == tax_id)
-        )
-        provider = result.scalar_one_or_none()
-        if provider:
-            return provider
+    normalized_input = _normalize_tax_id(tax_id) if tax_id else ""
+
+    if normalized_input:
+        # Load all providers with a tax_id and compare normalized
+        all_result = await session.execute(select(Provider).where(Provider.tax_id.isnot(None)))
+        tax_providers = all_result.scalars().all()
+        for p in tax_providers:
+            if _normalize_tax_id(p.tax_id) == normalized_input:
+                return p
 
     if provider_name:
         # 1. Exact substring match
@@ -112,8 +122,8 @@ async def find_or_create_provider(session, tax_id: str, provider_name: str = Non
             print(f"Fuzzy provider match skipped: {fuzz_exc}")
 
     new_provider = Provider(
-        fiscal_name=provider_name or f"Provider_{tax_id}",
-        tax_id=tax_id,
+        fiscal_name=provider_name or f"Provider_{normalized_input or 'UNKNOWN'}",
+        tax_id=normalized_input or None,
         active=True,
     )
     session.add(new_provider)
@@ -291,7 +301,7 @@ def process_segment(self, document_id: int, segment_id: int):
 
             # Drop lines whose quality is too low to be useful
             before_filter = len(table_lines)
-            table_lines = [ln for ln in table_lines if ln.get("extraction_confidence", 0) >= 0.2]
+            table_lines = [ln for ln in table_lines if ln.get("extraction_confidence", 0) >= 0.15]
             if len(table_lines) < before_filter:
                 print(f"[segment {segment_id}] Dropped {before_filter - len(table_lines)} low-confidence lines")
 
