@@ -2,14 +2,15 @@ import apiClient from './client';
 import type {
   Invoice,
   InvoiceLine,
+  PaginatedResponse,
   UpdateInvoiceHeaderRequest,
   UpdateInvoiceLineRequest,
   HomologateLineRequest,
   ListParams,
 } from '../types';
 
-export const getPendingInvoices = async (params?: ListParams): Promise<Invoice[]> => {
-  const response = await apiClient.get<Invoice[]>('/api/reviews/invoices/pending', { params });
+export const getPendingInvoices = async (params?: ListParams): Promise<PaginatedResponse<Invoice>> => {
+  const response = await apiClient.get<PaginatedResponse<Invoice>>('/api/reviews/invoices/pending', { params });
   return response.data;
 };
 

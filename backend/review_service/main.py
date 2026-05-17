@@ -66,7 +66,31 @@ async def list_pending_invoices(
     )
     invoices = result.scalars().all()
     pages = max(1, (total + page_size - 1) // page_size)
-    return {"items": invoices, "total": total, "page": page, "size": page_size, "pages": pages}
+    items = []
+    for inv in invoices:
+        provider = inv.provider
+        items.append({
+            "id": inv.id,
+            "detected_doc_id": inv.detected_doc_id,
+            "provider_id": inv.provider_id,
+            "provider": {"id": provider.id, "name": provider.fiscal_name, "tax_id": provider.tax_id} if provider else None,
+            "provider_name": provider.fiscal_name if provider else None,
+            "invoice_number": inv.invoice_number,
+            "invoice_date": str(inv.invoice_date) if inv.invoice_date else None,
+            "subtotal": float(inv.subtotal) if inv.subtotal is not None else 0.0,
+            "vat": float(inv.vat) if inv.vat is not None else 0.0,
+            "vat_amount": float(inv.vat) if inv.vat is not None else 0.0,
+            "total": float(inv.total) if inv.total is not None else 0.0,
+            "currency": inv.currency or "EUR",
+            "status": inv.status or "pending_review",
+            "confidence": 0.8,
+            "lines": [{"id": l.id} for l in inv.lines] if inv.lines else [],
+            "validated_at": inv.validated_at.isoformat() if inv.validated_at else None,
+            "validated_by": inv.validated_by,
+            "created_at": None,
+            "updated_at": None,
+        })
+    return {"items": items, "total": total, "page": page, "size": page_size, "pages": pages}
 
 
 @app.get("/reviews/invoices/{invoice_id}")

@@ -440,7 +440,7 @@ export default function InvoiceReview() {
       key: 'status',
       width: 110,
       render: (status: LineStatus) => (
-        <Tag color={lineStatusColors[status]}>{status.replace(/_/g, ' ').toUpperCase()}</Tag>
+        <Tag color={lineStatusColors[status]}>{(status || '').replace(/_/g, ' ').toUpperCase()}</Tag>
       ),
     },
     {
@@ -527,7 +527,7 @@ export default function InvoiceReview() {
               : 'blue'
           }
         >
-          {invoice.status.replace(/_/g, ' ').toUpperCase()}
+          {(invoice.status || '').replace(/_/g, ' ').toUpperCase()}
         </Tag>
       </Space>
 

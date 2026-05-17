@@ -110,7 +110,7 @@ export default function InvoiceReviewList() {
       width: 140,
       render: (status: InvoiceStatus) => (
         <Tag color={statusColors[status] || 'default'}>
-          {status.replace(/_/g, ' ').toUpperCase()}
+          {(status || '').replace(/_/g, ' ').toUpperCase()}
         </Tag>
       ),
     },
@@ -184,13 +184,13 @@ export default function InvoiceReviewList() {
       <Card>
         <Table
           columns={columns}
-          dataSource={Array.isArray(data) ? data : []}
+          dataSource={data?.items || []}
           rowKey="id"
           loading={isLoading}
           pagination={{
             current: params.page,
             pageSize: params.size,
-            total: Array.isArray(data) ? data.length : 0,
+            total: data?.total || 0,
             showSizeChanger: true,
             showTotal: (total) => `Total ${total} invoices`,
             onChange: (page, pageSize) =>

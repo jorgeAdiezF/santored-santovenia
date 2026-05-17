@@ -129,7 +129,7 @@ export default function DocumentDetail() {
           }
           text={
             <Tag color={segmentStatusColors[status]}>
-              {status.replace(/_/g, ' ').toUpperCase()}
+              {(status || '').replace(/_/g, ' ').toUpperCase()}
             </Tag>
           }
         />
@@ -190,7 +190,7 @@ export default function DocumentDetail() {
                   : document.status === 'error' ? 'error'
                   : 'processing'
                 }>
-                  {document.status.replace(/_/g, ' ').toUpperCase()}
+                  {(document.status || '').replace(/_/g, ' ').toUpperCase()}
                 </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="Pages">{document.page_count}</Descriptions.Item>
