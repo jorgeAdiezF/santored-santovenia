@@ -211,7 +211,10 @@ async def get_document(
 ):
     result = await db.execute(
         select(Document)
-        .options(selectinload(Document.pages), selectinload(Document.detected_docs))
+        .options(
+            selectinload(Document.pages),
+            selectinload(Document.detected_docs).selectinload(DetectedDoc.invoice),
+        )
         .where(Document.id == document_id)
     )
     document = result.scalar_one_or_none()
@@ -235,8 +238,8 @@ async def get_document(
         "updated_at": upload_date,
         "status": status,
         "page_count": document.page_count,
-        "pages": [{"id": p.id, "document_id": p.document_id, "page_number": p.page_number, "image_path": p.image_path} for p in document.pages],
-        "detected_docs": [{"id": d.id, "document_id": d.document_id, "start_page": d.start_page, "end_page": d.end_page, "page_start": d.start_page, "page_end": d.end_page, "status": d.status, "confidence": float(d.confidence) if d.confidence is not None else 0.5, "doc_type": "invoice", "created_at": None, "updated_at": None} for d in document.detected_docs],
+        "pages": [{"id": p.id, "document_id": p.document_id, "page_number": p.page_number, "image_path": p.image_path, "thumbnail_path": p.image_path} for p in document.pages],
+        "detected_docs": [{"id": d.id, "document_id": d.document_id, "start_page": d.start_page, "end_page": d.end_page, "page_start": d.start_page, "page_end": d.end_page, "status": d.status, "confidence": float(d.confidence) if d.confidence is not None else 0.5, "doc_type": "invoice", "invoice_id": d.invoice.id if d.invoice else None, "created_at": None, "updated_at": None} for d in document.detected_docs],
         "processed_at": None,
         "error_message": None,
     }

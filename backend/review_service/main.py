@@ -77,7 +77,10 @@ async def get_invoice_detail(
 ):
     result = await db.execute(
         select(Invoice)
-        .options(selectinload(Invoice.lines), selectinload(Invoice.provider))
+        .options(
+            selectinload(Invoice.lines).selectinload(InvoiceLine.destinations),
+            selectinload(Invoice.provider),
+        )
         .where(Invoice.id == invoice_id)
     )
     invoice = result.scalar_one_or_none()
@@ -85,21 +88,29 @@ async def get_invoice_detail(
         raise NotFoundError("Invoice", invoice_id)
 
     provider = invoice.provider
+    vat = float(invoice.vat) if invoice.vat is not None else 0.0
+    subtotal = float(invoice.subtotal) if invoice.subtotal is not None else 0.0
+    total = float(invoice.total) if invoice.total is not None else subtotal + vat
     return {
         "id": invoice.id,
         "detected_doc_id": invoice.detected_doc_id,
         "provider_id": invoice.provider_id,
+        "provider": {"id": provider.id, "name": provider.fiscal_name, "tax_id": provider.tax_id} if provider else None,
         "provider_name": provider.fiscal_name if provider else None,
         "tax_id": invoice.tax_id,
         "invoice_number": invoice.invoice_number,
         "invoice_date": str(invoice.invoice_date) if invoice.invoice_date else None,
-        "subtotal": float(invoice.subtotal) if invoice.subtotal is not None else None,
-        "vat": float(invoice.vat) if invoice.vat is not None else None,
-        "total": float(invoice.total) if invoice.total is not None else None,
+        "subtotal": subtotal,
+        "vat": vat,
+        "vat_amount": vat,
+        "total": total,
         "currency": invoice.currency or "EUR",
         "status": invoice.status,
+        "confidence": 0.8,
         "validated_at": invoice.validated_at.isoformat() if invoice.validated_at else None,
         "validated_by": invoice.validated_by,
+        "created_at": None,
+        "updated_at": None,
         "lines": [
             {
                 "id": line.id,
@@ -107,17 +118,23 @@ async def get_invoice_detail(
                 "line_number": line.line_number,
                 "supplier_code": line.supplier_code,
                 "original_description": line.original_description or "",
-                "quantity": float(line.quantity) if line.quantity is not None else None,
-                "unit": line.unit,
-                "unit_price": float(line.unit_price) if line.unit_price is not None else None,
-                "discount": float(line.discount) if line.discount is not None else None,
-                "subtotal": float(line.subtotal) if line.subtotal is not None else None,
-                "tax_rate": float(line.tax_rate) if line.tax_rate is not None else None,
+                "description": line.original_description or "",
+                "quantity": float(line.quantity) if line.quantity is not None else 0.0,
+                "unit": line.unit or "",
+                "unit_price": float(line.unit_price) if line.unit_price is not None else 0.0,
+                "discount": float(line.discount) if line.discount is not None else 0.0,
+                "subtotal": float(line.subtotal) if line.subtotal is not None else 0.0,
+                "tax_rate": float(line.tax_rate) if line.tax_rate is not None else 0.0,
+                "vat_rate": float(line.tax_rate) if line.tax_rate is not None else 0.0,
+                "vat_amount": round(float(line.subtotal or 0) * float(line.tax_rate or 0) / 100, 2),
+                "total": round(float(line.subtotal or 0) * (1 + float(line.tax_rate or 0) / 100), 2),
                 "status": line.status or "pending_homologation",
                 "confidence": float(line.extraction_confidence) if line.extraction_confidence is not None else 0.5,
                 "extraction_confidence": float(line.extraction_confidence) if line.extraction_confidence is not None else 0.5,
-                "material_id": line.material_id,
-                "homologated_description": line.homologated_description,
+                "material": None,
+                "destinations": [],
+                "created_at": None,
+                "updated_at": None,
             }
             for line in invoice.lines
         ],
