@@ -309,6 +309,7 @@ def extract_header(text: str) -> Dict[str, Any]:
             match = pattern.search(text)
             if match:
                 result["provider_name"] = match.group(1).strip()[:100]
+                confidence_factors += 1
                 break
 
     result["confidence"] = confidence_factors / total_factors

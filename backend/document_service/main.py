@@ -96,6 +96,15 @@ async def upload_document(
         await db.flush()
 
         if file_type == "application/pdf" or filename.lower().endswith(".pdf"):
+            # Store PDF at canonical path so OCR worker can access it for digital extraction
+            try:
+                upload_bytes(
+                    object_name=f"documents/{document.id}/original.pdf",
+                    data=content,
+                    content_type="application/pdf",
+                )
+            except Exception as e:
+                print(f"Warning: Failed to store canonical PDF: {str(e)}")
             try:
                 page_paths = process_document_pages(document.id, content)
                 for page_number, image_path in page_paths:

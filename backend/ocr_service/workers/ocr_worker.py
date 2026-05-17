@@ -185,6 +185,7 @@ def process_segment(self, document_id: int, segment_id: int):
             # ----------------------------------------------------------------
             table_lines = []
             pdf_extraction_attempted = False
+            pdf_text = ""  # text extracted from digital PDF layer (better quality)
 
             try:
                 from minio import Minio
@@ -204,10 +205,12 @@ def process_segment(self, document_id: int, segment_id: int):
                     digital_extractor = DigitalPDFExtractor()
                     if digital_extractor.can_extract(pdf_bytes):
                         pdf_extraction_attempted = True
+                        # Extract high-quality text for header parsing
+                        pdf_text = digital_extractor.extract_text(pdf_bytes)
                         digital_lines = digital_extractor.extract_invoice_lines(pdf_bytes)
                         high_confidence_lines = [
                             ln for ln in digital_lines
-                            if ln.get("extraction_confidence", 0) > 0.6
+                            if ln.get("extraction_confidence", 0) > 0.4
                         ]
                         if high_confidence_lines:
                             table_lines = digital_lines
@@ -258,7 +261,9 @@ def process_segment(self, document_id: int, segment_id: int):
                     f"{len(table_lines)} lines extracted"
                 )
 
-            header = extract_header(full_text)
+            # Use digital PDF text for header if available (much more accurate than Tesseract)
+            header_text = pdf_text if pdf_text else full_text
+            header = extract_header(header_text)
 
             # ----------------------------------------------------------------
             # Validate / sanitise header fields
