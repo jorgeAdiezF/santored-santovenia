@@ -1,0 +1,395 @@
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from fastapi import FastAPI, Depends, HTTPException, status, Query
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, or_
+from sqlalchemy.orm import selectinload
+from typing import List, Optional
+
+from shared.database import get_db
+from shared.models import MaterialMaster, MaterialAlias, Provider, ProviderAlias, User
+from shared.auth import get_current_user
+from shared.schemas import (
+    MaterialCreate, MaterialUpdate, MaterialResponse, MaterialAliasCreate, MaterialAliasResponse,
+    ProviderCreate, ProviderUpdate, ProviderResponse, ProviderAliasCreate, ProviderAliasResponse,
+    MessageResponse,
+)
+from shared.exceptions import NotFoundError, ConflictError
+from shared.config import get_settings
+from shared.audit import record_audit
+
+settings = get_settings()
+
+app = FastAPI(title="Materials Service", version="1.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.get_cors_origins(),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "service": "materials_service"}
+
+
+# ---- Materials endpoints ----
+
+@app.get("/materials/search", response_model=List[MaterialResponse])
+async def search_materials(
+    text: Optional[str] = Query(None),
+    family: Optional[str] = Query(None),
+    subfamily: Optional[str] = Query(None),
+    dimensions: Optional[str] = Query(None),
+    active_only: bool = True,
+    skip: int = 0,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    query = select(MaterialMaster).options(selectinload(MaterialMaster.aliases))
+
+    if active_only:
+        query = query.where(MaterialMaster.active == True)
+    if text:
+        query = query.where(
+            or_(
+                MaterialMaster.normalized_description.ilike(f"%{text}%"),
+                MaterialMaster.master_code.ilike(f"%{text}%"),
+            )
+        )
+    if family:
+        query = query.where(MaterialMaster.family.ilike(f"%{family}%"))
+    if subfamily:
+        query = query.where(MaterialMaster.subfamily.ilike(f"%{subfamily}%"))
+    if dimensions:
+        query = query.where(MaterialMaster.dimensions.ilike(f"%{dimensions}%"))
+
+    query = query.offset(skip).limit(limit)
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+@app.get("/materials/families")
+async def list_families(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(MaterialMaster.family).where(
+            MaterialMaster.family.isnot(None),
+            MaterialMaster.active == True,
+        ).distinct()
+    )
+    families = [row[0] for row in result.all() if row[0]]
+    return [{"id": i + 1, "code": name, "name": name} for i, name in enumerate(sorted(families))]
+
+
+@app.get("/materials")
+async def list_materials_paginated(
+    page: int = 1,
+    size: int = 20,
+    search: Optional[str] = Query(None),
+    family: Optional[str] = Query(None),
+    active_only: bool = True,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from sqlalchemy import func as sqlfunc
+    query = select(MaterialMaster).options(selectinload(MaterialMaster.aliases))
+    if active_only:
+        query = query.where(MaterialMaster.active == True)
+    if search:
+        query = query.where(
+            or_(
+                MaterialMaster.normalized_description.ilike(f"%{search}%"),
+                MaterialMaster.master_code.ilike(f"%{search}%"),
+            )
+        )
+    if family:
+        query = query.where(MaterialMaster.family.ilike(f"%{family}%"))
+
+    count_result = await db.execute(select(sqlfunc.count()).select_from(query.subquery()))
+    total = count_result.scalar_one()
+
+    offset = (page - 1) * size
+    result = await db.execute(query.offset(offset).limit(size))
+    items = result.scalars().all()
+    pages = max(1, (total + size - 1) // size)
+    serialized = [MaterialResponse.model_validate(m).model_dump() for m in items]
+    return {"items": serialized, "total": total, "page": page, "size": size, "pages": pages}
+
+
+@app.post("/materials", response_model=MaterialResponse, status_code=status.HTTP_201_CREATED)
+async def create_material(
+    material_data: MaterialCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    existing = await db.execute(
+        select(MaterialMaster).where(MaterialMaster.master_code == material_data.master_code)
+    )
+    if existing.scalar_one_or_none():
+        raise ConflictError(f"Material with code '{material_data.master_code}' already exists")
+
+    material = MaterialMaster(**material_data.model_dump())
+    db.add(material)
+    await db.flush()
+
+    await record_audit(db, "create", "material", material.id, current_user.id,
+                       new_value={"name": material.normalized_description})
+
+    result = await db.execute(
+        select(MaterialMaster).options(selectinload(MaterialMaster.aliases)).where(MaterialMaster.id == material.id)
+    )
+    return result.scalar_one()
+
+
+@app.get("/materials/{material_id}", response_model=MaterialResponse)
+async def get_material(
+    material_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(MaterialMaster).options(selectinload(MaterialMaster.aliases)).where(MaterialMaster.id == material_id)
+    )
+    material = result.scalar_one_or_none()
+    if not material:
+        raise NotFoundError("Material", material_id)
+    return material
+
+
+@app.put("/materials/{material_id}", response_model=MaterialResponse)
+async def update_material(
+    material_id: int,
+    material_data: MaterialUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(select(MaterialMaster).where(MaterialMaster.id == material_id))
+    material = result.scalar_one_or_none()
+    if not material:
+        raise NotFoundError("Material", material_id)
+
+    material_update_fields = material_data.model_dump(exclude_unset=True)
+    for field, value in material_update_fields.items():
+        setattr(material, field, value)
+
+    await db.flush()
+    await record_audit(db, "update", "material", material_id, current_user.id,
+                       new_value=material_update_fields)
+
+    result = await db.execute(
+        select(MaterialMaster).options(selectinload(MaterialMaster.aliases)).where(MaterialMaster.id == material_id)
+    )
+    return result.scalar_one()
+
+
+@app.delete("/materials/{material_id}", response_model=MessageResponse)
+async def delete_material(
+    material_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(select(MaterialMaster).where(MaterialMaster.id == material_id))
+    material = result.scalar_one_or_none()
+    if not material:
+        raise NotFoundError("Material", material_id)
+
+    material.active = False
+    await db.flush()
+    await record_audit(db, "delete", "material", material_id, current_user.id,
+                       old_value={"name": material.normalized_description})
+    return MessageResponse(message=f"Material {material_id} deactivated")
+
+
+@app.get("/materials/{material_id}/aliases", response_model=List[MaterialAliasResponse])
+async def get_material_aliases(
+    material_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(select(MaterialMaster).where(MaterialMaster.id == material_id))
+    if not result.scalar_one_or_none():
+        raise NotFoundError("Material", material_id)
+
+    result = await db.execute(
+        select(MaterialAlias).where(MaterialAlias.material_id == material_id)
+    )
+    return result.scalars().all()
+
+
+@app.post("/materials/{material_id}/aliases", response_model=MaterialAliasResponse, status_code=status.HTTP_201_CREATED)
+async def add_material_alias(
+    material_id: int,
+    alias_data: MaterialAliasCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(select(MaterialMaster).where(MaterialMaster.id == material_id))
+    if not result.scalar_one_or_none():
+        raise NotFoundError("Material", material_id)
+
+    alias = MaterialAlias(material_id=material_id, **alias_data.model_dump())
+    db.add(alias)
+    await db.flush()
+    return alias
+
+
+@app.delete("/materials/{material_id}/aliases/{alias_id}", response_model=MessageResponse)
+async def remove_material_alias(
+    material_id: int,
+    alias_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(MaterialAlias).where(
+            MaterialAlias.id == alias_id,
+            MaterialAlias.material_id == material_id,
+        )
+    )
+    alias = result.scalar_one_or_none()
+    if not alias:
+        raise NotFoundError("Alias", alias_id)
+
+    await db.delete(alias)
+    await db.flush()
+    return MessageResponse(message=f"Alias {alias_id} removed")
+
+
+# ---- Providers endpoints ----
+
+@app.get("/providers")
+async def list_providers(
+    page: int = 1,
+    size: int = 20,
+    skip: int = 0,
+    limit: int = 0,
+    active_only: bool = True,
+    search: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from sqlalchemy import func as sqlfunc
+    query = select(Provider).options(selectinload(Provider.aliases))
+    if active_only:
+        query = query.where(Provider.active == True)
+    if search:
+        query = query.where(
+            or_(
+                Provider.fiscal_name.ilike(f"%{search}%"),
+                Provider.tax_id.ilike(f"%{search}%"),
+            )
+        )
+    count_result = await db.execute(select(sqlfunc.count()).select_from(query.subquery()))
+    total = count_result.scalar_one()
+
+    # Support both legacy skip/limit and new page/size params
+    if limit > 0:
+        offset = skip
+        page_size = limit
+    else:
+        page_size = size
+        offset = (page - 1) * size
+
+    result = await db.execute(query.offset(offset).limit(page_size))
+    items = result.scalars().all()
+    pages = max(1, (total + page_size - 1) // page_size)
+    serialized = [ProviderResponse.model_validate(p).model_dump() for p in items]
+    return {"items": serialized, "total": total, "page": page, "size": page_size, "pages": pages}
+
+
+@app.post("/providers", response_model=ProviderResponse, status_code=status.HTTP_201_CREATED)
+async def create_provider(
+    provider_data: ProviderCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if provider_data.tax_id:
+        existing = await db.execute(
+            select(Provider).where(Provider.tax_id == provider_data.tax_id)
+        )
+        if existing.scalar_one_or_none():
+            raise ConflictError(f"Provider with tax_id '{provider_data.tax_id}' already exists")
+
+    provider = Provider(**provider_data.model_dump())
+    db.add(provider)
+    await db.flush()
+
+    await record_audit(db, "create", "provider", provider.id, current_user.id,
+                       new_value={"fiscal_name": provider.fiscal_name, "tax_id": provider.tax_id})
+
+    result = await db.execute(
+        select(Provider).options(selectinload(Provider.aliases)).where(Provider.id == provider.id)
+    )
+    return result.scalar_one()
+
+
+@app.get("/providers/{provider_id}", response_model=ProviderResponse)
+async def get_provider(
+    provider_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(Provider).options(selectinload(Provider.aliases)).where(Provider.id == provider_id)
+    )
+    provider = result.scalar_one_or_none()
+    if not provider:
+        raise NotFoundError("Provider", provider_id)
+    return provider
+
+
+@app.put("/providers/{provider_id}", response_model=ProviderResponse)
+async def update_provider(
+    provider_id: int,
+    provider_data: ProviderUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(select(Provider).where(Provider.id == provider_id))
+    provider = result.scalar_one_or_none()
+    if not provider:
+        raise NotFoundError("Provider", provider_id)
+
+    provider_update_fields = provider_data.model_dump(exclude_unset=True)
+    for field, value in provider_update_fields.items():
+        setattr(provider, field, value)
+
+    await db.flush()
+    await record_audit(db, "update", "provider", provider_id, current_user.id,
+                       new_value=provider_update_fields)
+
+    result = await db.execute(
+        select(Provider).options(selectinload(Provider.aliases)).where(Provider.id == provider_id)
+    )
+    return result.scalar_one()
+
+
+@app.get("/providers/{provider_id}/aliases", response_model=List[ProviderAliasResponse])
+async def get_provider_aliases(
+    provider_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(select(Provider).where(Provider.id == provider_id))
+    if not result.scalar_one_or_none():
+        raise NotFoundError("Provider", provider_id)
+
+    result = await db.execute(
+        select(ProviderAlias).where(ProviderAlias.provider_id == provider_id)
+    )
+    return result.scalars().all()
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8005)

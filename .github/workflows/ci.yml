@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, "claude/**"]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  lint-and-test-backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: invoices_test
+          POSTGRES_USER: invoices_user
+          POSTGRES_PASSWORD: invoices_pass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install shared dependencies
+        run: pip install -r backend/shared/requirements.txt
+
+      - name: Install test dependencies
+        run: pip install pytest pytest-asyncio httpx aiosqlite
+
+      - name: Run tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://invoices_user:invoices_pass@localhost:5432/invoices_test
+          JWT_SECRET: test-secret-key
+          REDIS_URL: redis://localhost:6379/0
+          MINIO_URL: localhost:9000
+          MINIO_ACCESS_KEY: test
+          MINIO_SECRET_KEY: test
+          MINIO_BUCKET: test
+        run: pytest backend/ -v --tb=short
+
+  lint-frontend:
+    name: Frontend lint & build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+  docker-build:
+    name: Docker build check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    strategy:
+      matrix:
+        service:
+          - auth_service
+          - document_service
+          - materials_service
+          - analytics_service
+          - api_gateway
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build ${{ matrix.service }}
+        run: |
+          docker build \
+            -f backend/${{ matrix.service }}/Dockerfile \
+            -t invoices/${{ matrix.service }}:test \
+            .
