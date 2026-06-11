@@ -9,6 +9,21 @@ CIF_PATTERN = re.compile(r"\b[ABCDEFGHJKLMNPQRSUVW]\d{7}[A-J0-9]\b", re.IGNORECA
 NIF_PATTERN = re.compile(r"\b\d{8}[A-Z]\b", re.IGNORECASE)
 NIE_PATTERN = re.compile(r"\b[XYZ]\d{7}[A-Z]\b", re.IGNORECASE)
 
+# Boundary-free "core" variants used to validate a candidate after separators
+# (spaces, hyphens, dots) have been stripped — real invoices often print the
+# tax id as "B-12345678", "B 1234567 8" or "N.I.F. B12345678".
+_CIF_CORE = re.compile(r"[ABCDEFGHJKLMNPQRSUVW]\d{7}[A-J0-9]", re.IGNORECASE)
+_NIF_CORE = re.compile(r"\d{8}[A-Z]", re.IGNORECASE)
+_NIE_CORE = re.compile(r"[XYZ]\d{7}[A-Z]", re.IGNORECASE)
+
+# Label that introduces a tax id (CIF / NIF / NIE / DNI, with or without dots),
+# capturing the following token which may contain separators.
+_TAXID_LABEL_RE = re.compile(
+    r"(?:C\.?\s*I\.?\s*F\.?|N\.?\s*I\.?\s*F\.?|N\.?\s*I\.?\s*E\.?|D\.?\s*N\.?\s*I\.?)"
+    r"[:\s#nºo\.\-/]*([A-Za-z0-9][A-Za-z0-9\-\.\s]{6,14})",
+    re.IGNORECASE,
+)
+
 # Invoice number patterns – extended with additional formats from real Spanish invoices
 INVOICE_NUMBER_PATTERNS = [
     # Original patterns
@@ -189,11 +204,25 @@ def normalize_tax_id(tax_id: str) -> Optional[str]:
 
 
 def extract_tax_id(text: str) -> Optional[str]:
-    """Extract the first valid Spanish tax ID from text."""
-    for pattern in [CIF_PATTERN, NIF_PATTERN, NIE_PATTERN]:
+    """Extract the first valid Spanish tax ID from text.
+
+    Handles both contiguous ids (``B12345678``) and separated forms commonly
+    produced by OCR / human formatting (``CIF: B-12345678``, ``N.I.F. B 1234567 8``).
+    """
+    # 1. Strict contiguous match anywhere in the text.
+    for pattern in (CIF_PATTERN, NIF_PATTERN, NIE_PATTERN):
         match = pattern.search(text)
         if match:
             return normalize_tax_id(match.group(0))
+
+    # 2. Label-anchored fallback: strip separators from the captured token and
+    #    validate the cleaned candidate against the core patterns.
+    for label_match in _TAXID_LABEL_RE.finditer(text):
+        cleaned = re.sub(r"[\s\-\.]", "", label_match.group(1)).upper()
+        for core in (_CIF_CORE, _NIF_CORE, _NIE_CORE):
+            core_match = core.search(cleaned)
+            if core_match:
+                return core_match.group(0)
     return None
 
 
