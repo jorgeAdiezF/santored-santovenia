@@ -110,6 +110,7 @@ async def list_pending_homologation(
 ):
     result = await db.execute(
         select(InvoiceLine)
+        .options(selectinload(InvoiceLine.destinations))
         .where(InvoiceLine.status.in_(["pending_homologation", "no_match"]))
         .offset(skip)
         .limit(limit)

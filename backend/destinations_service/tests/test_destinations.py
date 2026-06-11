@@ -37,7 +37,10 @@ async def _create_destination(
 async def test_list_destinations_empty(client: AsyncClient, db_session: AsyncSession):
     response = await client.get("/destinations")
     assert response.status_code == 200
-    assert response.json() == []
+    data = response.json()
+    # Endpoint returns a paginated envelope: {items, total, page, size, pages}
+    assert data["items"] == []
+    assert data["total"] == 0
 
 
 async def test_list_destinations(client: AsyncClient, db_session: AsyncSession):
@@ -47,8 +50,8 @@ async def test_list_destinations(client: AsyncClient, db_session: AsyncSession):
     response = await client.get("/destinations")
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 2
-    names = [d["name"] for d in data]
+    assert data["total"] == 2
+    names = [d["name"] for d in data["items"]]
     assert "Almacén A" in names
     assert "Almacén B" in names
 
@@ -63,7 +66,7 @@ async def test_list_destinations_excludes_inactive(
     response = await client.get("/destinations")
     assert response.status_code == 200
     data = response.json()
-    names = [d["name"] for d in data]
+    names = [d["name"] for d in data["items"]]
     assert "Activo" in names
     assert "Inactivo" not in names
 
@@ -132,7 +135,7 @@ async def test_delete_destination(client: AsyncClient, db_session: AsyncSession)
 
     # The destination should no longer appear in active listing
     list_response = await client.get("/destinations")
-    ids = [d["id"] for d in list_response.json()]
+    ids = [d["id"] for d in list_response.json()["items"]]
     assert dest.id not in ids
 
 

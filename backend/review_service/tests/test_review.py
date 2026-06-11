@@ -78,15 +78,20 @@ async def test_get_pending_invoices(client: AsyncClient, db_session: AsyncSessio
     response = await client.get("/reviews/invoices/pending")
     assert response.status_code == 200
     data = response.json()
-    assert isinstance(data, list)
-    assert len(data) >= 1
-    assert all(inv["status"] == "pending_review" for inv in data)
+    # Endpoint returns a paginated envelope: {items, total, page, size, pages}
+    assert isinstance(data, dict)
+    assert "items" in data and "total" in data
+    items = data["items"]
+    assert len(items) >= 1
+    assert all(inv["status"] == "pending_review" for inv in items)
 
 
 async def test_get_pending_invoices_empty(client: AsyncClient, db_session: AsyncSession):
     response = await client.get("/reviews/invoices/pending")
     assert response.status_code == 200
-    assert response.json() == []
+    data = response.json()
+    assert data["items"] == []
+    assert data["total"] == 0
 
 
 async def test_get_invoice(client: AsyncClient, db_session: AsyncSession):
@@ -133,7 +138,7 @@ async def test_finalize_invoice(client: AsyncClient, db_session: AsyncSession):
     response = await client.post(f"/reviews/invoices/{invoice.id}/finalize")
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "validated"
+    assert data["status"] == "approved"
 
 
 async def test_finalize_invoice_with_pending_lines(

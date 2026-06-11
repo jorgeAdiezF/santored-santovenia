@@ -87,7 +87,9 @@ async def test_get_pending(client: AsyncClient, db_session: AsyncSession):
     data = response.json()
     assert isinstance(data, list)
     assert len(data) >= 1
-    assert data[0]["status"] == "pending_homologation"
+    # InvoiceLineResponse normalizes pending_homologation -> pending for the
+    # frontend LineStatus type ('pending' | 'homologated' | 'manual' | 'rejected')
+    assert data[0]["status"] == "pending"
 
 
 async def test_get_pending_empty(client: AsyncClient, db_session: AsyncSession):

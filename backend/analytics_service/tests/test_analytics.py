@@ -133,8 +133,9 @@ async def test_dashboard_empty(client: AsyncClient, db_session: AsyncSession):
     data = response.json()
     assert "total_invoices" in data
     assert "pending_review" in data
-    assert "validated_this_month" in data
-    assert "pending_homologation_lines" in data
+    # Keys aligned with the frontend DashboardStats type
+    assert "total_spent_this_month" in data
+    assert "pending_homologation" in data
     assert data["total_invoices"] == 0
     assert data["pending_review"] == 0
 

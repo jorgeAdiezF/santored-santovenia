@@ -12,7 +12,7 @@ from typing import List, Optional
 from datetime import datetime, timezone
 
 from shared.database import get_db
-from shared.models import Invoice, InvoiceLine, MaterialMaster, MaterialAlias, PriceHistory, User
+from shared.models import Invoice, InvoiceLine, MaterialMaster, MaterialAlias, PriceHistory, Provider, User
 from shared.auth import get_current_user
 from shared.schemas import (
     InvoiceResponse, InvoiceUpdate, InvoiceLineResponse, InvoiceLineUpdate,
@@ -165,6 +165,15 @@ async def get_invoice_detail(
     }
 
 
+# Eager-load options needed to safely serialize an Invoice via InvoiceResponse
+# (provider.aliases and lines.destinations are lazy relationships that would
+# otherwise trigger MissingGreenlet errors during async serialization).
+_INVOICE_LOAD_OPTS = (
+    selectinload(Invoice.provider).selectinload(Provider.aliases),
+    selectinload(Invoice.lines).selectinload(InvoiceLine.destinations),
+)
+
+
 @app.put("/reviews/invoices/{invoice_id}", response_model=InvoiceResponse)
 async def update_invoice(
     invoice_id: int,
@@ -172,7 +181,9 @@ async def update_invoice(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(Invoice).where(Invoice.id == invoice_id))
+    result = await db.execute(
+        select(Invoice).options(*_INVOICE_LOAD_OPTS).where(Invoice.id == invoice_id)
+    )
     invoice = result.scalar_one_or_none()
     if not invoice:
         raise NotFoundError("Invoice", invoice_id)
@@ -196,7 +207,9 @@ async def update_invoice_line(
     current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(
-        select(InvoiceLine).where(
+        select(InvoiceLine)
+        .options(selectinload(InvoiceLine.destinations))
+        .where(
             InvoiceLine.id == line_id,
             InvoiceLine.invoice_id == invoice_id,
         )
@@ -222,7 +235,7 @@ async def finalize_invoice(
     current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(
-        select(Invoice).options(selectinload(Invoice.lines)).where(Invoice.id == invoice_id)
+        select(Invoice).options(*_INVOICE_LOAD_OPTS).where(Invoice.id == invoice_id)
     )
     invoice = result.scalar_one_or_none()
     if not invoice:
@@ -277,7 +290,9 @@ async def reject_invoice(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(Invoice).where(Invoice.id == invoice_id))
+    result = await db.execute(
+        select(Invoice).options(*_INVOICE_LOAD_OPTS).where(Invoice.id == invoice_id)
+    )
     invoice = result.scalar_one_or_none()
     if not invoice:
         raise NotFoundError("Invoice", invoice_id)
@@ -299,6 +314,7 @@ async def list_pending_homologation_review(
 ):
     result = await db.execute(
         select(InvoiceLine)
+        .options(selectinload(InvoiceLine.destinations))
         .where(InvoiceLine.status.in_(["pending_homologation", "pending_review", "no_match"]))
         .offset(skip)
         .limit(limit)
@@ -313,7 +329,11 @@ async def assign_material_to_line(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(InvoiceLine).where(InvoiceLine.id == line_id))
+    result = await db.execute(
+        select(InvoiceLine)
+        .options(selectinload(InvoiceLine.destinations))
+        .where(InvoiceLine.id == line_id)
+    )
     line = result.scalar_one_or_none()
     if not line:
         raise NotFoundError("InvoiceLine", line_id)
